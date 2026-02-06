@@ -20,6 +20,9 @@ export class User {
     @Column()
     password: string;
 
+    @Column()
+    count: number;
+
     // 在实体中定义生成 UUID 的方法
     static generateId(): string {
         return v4();
