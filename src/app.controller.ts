@@ -30,9 +30,11 @@ export class AppController {
     private dataSource: DataSource,
   ) {}
 
-  @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  @Get('test')
+  @Public()
+  getHello(): Result {
+    console.log('Hello World!');
+    return Result.success(this.appService.getHello());
   }
 
   @Get('cat')

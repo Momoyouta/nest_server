@@ -1,0 +1,44 @@
+services:
+  db:
+    container_name: db
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: study_platform  # 预创建数据库
+    volumes:
+      # 1. 持久化数据目录
+      - ./mysql/data:/var/lib/mysql:z
+      # 2. 自动初始化目录：将宿主机的 init 文件夹映射到容器的初始化路径
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "3306:3306"
+  nestjs-server:
+    build: 
+      context: ./nest_server  # 重点：指向 nest_server 文件夹
+      dockerfile: Dockerfile
+    container_name: nestjs_app
+    restart: always
+    ports:
+      - "3002:3002"
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      DB_NAME: study_platform
+  nginx:
+    image: nginx:alpine
+    container_name: nginx_server
+    restart: always
+    ports:
+      - "80:80"    # 暴露宿主机的 80 端口
+    volumes:
+      # 1. 挂载前端打包好的静态文件到 Nginx 的默认 web 目录
+      - ./vite-app/dist:/usr/share/nginx/html:ro
+      # 2. 挂载 Nginx 配置文件
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - nestjs-server
