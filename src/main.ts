@@ -20,7 +20,7 @@ async function bootstrap() {
   // swagger
   const swaggerConfig = new DocumentBuilder()
     .setTitle('API Documentation')
-    .setDescription('学习平台接口文档')
+    .setDescription('学习平台接口文档hhhhhh')
     .setVersion('0.1')
     .build();
   const documentFactory = () =>
