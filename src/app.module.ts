@@ -11,6 +11,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from '@/common/guard/auth.guard';
 import { RequestContextMiddlewareMiddleware } from '@/common/middleware/request-context-middleware/request-context-middleware.middleware';
 import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
+import { RoleGuard } from './common/guard/role.guard';
 @Module({
   imports: [
     ConfigModule.forRoot({

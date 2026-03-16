@@ -1,38 +1,44 @@
 schema: spec-driven
 
 context: |
-  Tech stack:
-  - Framework: NestJS v11 (Express-based)
-  - Language: TypeScript
-  - Database: MySQL with TypeORM
-  - Authentication: JWT (RS256 keys), bcrypt
-  - Validation: class-validator, class-transformer
-  - API Documentation: @nestjs/swagger (OpenAPI 3.0)
-  - 接口返回类型均为 Result<T>，包含 code、message、data 字段。
+  技术栈：
+  - 框架：NestJS v11 (基于 Express)
+  - 语言：TypeScript
+  - 数据库：MySQL (使用 TypeORM)
+  - 认证：JWT (RS256 密钥), bcrypt
+  - 校验：class-validator, class-transformer
+  - API 文档：@nestjs/swagger (OpenAPI 3.0)
+  - 接口返回：所有接口返回类型均为 Result<T>，包含 code, msg, data 字段。
 
-  Conventions:
-  - Use conventional commits.
-  - Strict TypeScript and linting (ESLint + Prettier).
-  - Use Data Transfer Objects (DTOs) for incoming requests and responses.
-  - Follow RESTful API design principles.
-  - All APIs MUST conform to OpenAPI 3.0 standards and be documented using NestJS Swagger decorators (@ApiProperty, @ApiOperation, @ApiResponse, etc.).
-  - Security definitions (e.g., Bearer auth) should be included in API docs.
-  - **Error Handling**: Do NOT return null for missing resources. Instead, throw appropriate NestJS HttpExceptions (e.g., NotFoundException, BadRequestException). These will be intercepted by the global AllExceptionsFilter and formatted into a Result.error response.
+  规范：
+  - 使用约定式提交 (Conventional Commits)。
+  - 严格遵守 TypeScript 和代码检查 (ESLint + Prettier)。
+  - 使用 DTO (Data Transfer Objects) 处理请求和响应数据。
+  - 遵循 RESTful API 设计原则。
+  - 所有 API 必须符合 OpenAPI 3.0 标准，并使用 NestJS Swagger 装饰器（如 @ApiProperty, @ApiOperation, @ApiResponse 等）进行标注。
+  - API 文档中应包含安全定义（如 Bearer auth）。
+  - **错误处理**：资源不存在时不返回 null，而是抛出适当的 NestJS HttpException（如 NotFoundException, BadRequestException）。这些异常会被全局 AllExceptionsFilter 捕获并格式化为 Result.error 响应。
+
+  接口编写说明：
+  - **身份验证**：接口默认开启 JWT 验证。
+  - **跳过认证**：若接口无需登录即可访问，必须使用 `@Public()` 装饰器显式跳过 Auth 验证。
+  - **权限控制**：使用 `@Role()` 装饰器进行基于角色的访问控制。
 
 rules:
   proposal:
-    - Keep proposals under 500 words.
-    - Always include "Goals" and "Non-goals" sections.
-    - Briefly mention any new OpenAPI 3.0 endpoints that will be introduced.
+    - 提案字数控制在 500 字以内。
+    - 必须包含“目标 (Goals)”和“非目标 (Non-goals)”章节。
+    - 简要描述将引入的新 OpenAPI 3.0 接口。
+    - 必须使用中文撰写。
   design:
-    - Detail the OpenAPI 3.0 specifications for new APIs (methods, paths, request body, query params, response schemas).
-    - Specify TypeORM entity changes (columns, relations).
-    - Detail JWT auth role/guard requirements if applicable.
+    - 详细描述新接口的 OpenAPI 3.0 规范（方法、路径、请求体、查询参数、响应结构）。
+    - 明确 TypeORM 实体的变更（列、关联关系）。
+    - 如果适用，详细说明 JWT 认证的角色/守卫要求。
   specs:
-    - Use strict OpenAPI 3.0 structure to define the API contracts.
-    - Include precise validation rules mapping to class-validator decorators.
+    - 使用严格的 OpenAPI 3.0 结构定义 API 契约。
+    - 包含与 class-validator 装饰器对应的精确校验规则。
   tasks:
-    - Break tasks into chunks of max 2 hours.
-    - Always include a task for creating/updating DTOs with proper Swagger @ApiProperty decorators.
-    - Always include a task for updating controller Swagger decorators (@ApiOperation, @ApiTags).
-    - Always include a task for writing unit/e2e tests.
+    - 将任务拆分为最多 2 小时的颗粒度。
+    - 必须包含创建/更新带有 Swagger @ApiProperty 装饰器的 DTO 的任务。
+    - 必须包含更新控制器 Swagger 装饰器 (@ApiOperation, @ApiTags) 的任务。
+    - 不需要编写测试用例的任务。
