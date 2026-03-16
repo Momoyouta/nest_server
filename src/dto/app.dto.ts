@@ -1,9 +1,7 @@
-
-
 export class AppDto {
-    id: number;
-    
-    name: string;
-    
-    msg: string;
+  id: number;
+
+  name: string;
+
+  msg: string;
 }

@@ -1,7 +1,7 @@
-import {User} from "@/database/entities/user.entity";
+import { User } from '@/database/entities/user.entity';
 
 export class TokenPayloadDto {
-    userId: string;
-    roles: string[];
-    roleIds: string;
+  userId: string;
+  roles: string[];
+  roleIds: string;
 }

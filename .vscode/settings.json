@@ -1,3 +1,6 @@
 {
-  "geminicodeassist.codeGenerationPaneViewEnabled": false
+  "geminicodeassist.codeGenerationPaneViewEnabled": false,
+  "http.proxy": "http://127.0.0.1:7980",
+  "http.proxyStrictSSL": false
+
 }
