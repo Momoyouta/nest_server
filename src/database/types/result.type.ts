@@ -9,11 +9,21 @@ export class Result<T = any> {
     this.data = data;
   }
 
-  static success<T>( msg = 'success', data: T | null = null) {
+  /**
+   * 成功返回
+   * @param msg 消息
+   * @param data 数据
+   */
+  static success<T>(msg = 'success', data: T): Result<T> {
     return new Result(200, msg, data);
   }
 
-  static error(msg = 'error', code = 500) {
+  /**
+   * 错误返回
+   * @param msg 消息
+   * @param code 错误码
+   */
+  static error(msg = 'error', code = 500): Result<null> {
     return new Result(code, msg, null);
   }
 }

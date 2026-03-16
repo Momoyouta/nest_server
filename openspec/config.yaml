@@ -1,20 +1,38 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Tech stack:
+  - Framework: NestJS v11 (Express-based)
+  - Language: TypeScript
+  - Database: MySQL with TypeORM
+  - Authentication: JWT (RS256 keys), bcrypt
+  - Validation: class-validator, class-transformer
+  - API Documentation: @nestjs/swagger (OpenAPI 3.0)
+  - 接口返回类型均为 Result<T>，包含 code、message、data 字段。
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+  Conventions:
+  - Use conventional commits.
+  - Strict TypeScript and linting (ESLint + Prettier).
+  - Use Data Transfer Objects (DTOs) for incoming requests and responses.
+  - Follow RESTful API design principles.
+  - All APIs MUST conform to OpenAPI 3.0 standards and be documented using NestJS Swagger decorators (@ApiProperty, @ApiOperation, @ApiResponse, etc.).
+  - Security definitions (e.g., Bearer auth) should be included in API docs.
+  - **Error Handling**: Do NOT return null for missing resources. Instead, throw appropriate NestJS HttpExceptions (e.g., NotFoundException, BadRequestException). These will be intercepted by the global AllExceptionsFilter and formatted into a Result.error response.
+
+rules:
+  proposal:
+    - Keep proposals under 500 words.
+    - Always include "Goals" and "Non-goals" sections.
+    - Briefly mention any new OpenAPI 3.0 endpoints that will be introduced.
+  design:
+    - Detail the OpenAPI 3.0 specifications for new APIs (methods, paths, request body, query params, response schemas).
+    - Specify TypeORM entity changes (columns, relations).
+    - Detail JWT auth role/guard requirements if applicable.
+  specs:
+    - Use strict OpenAPI 3.0 structure to define the API contracts.
+    - Include precise validation rules mapping to class-validator decorators.
+  tasks:
+    - Break tasks into chunks of max 2 hours.
+    - Always include a task for creating/updating DTOs with proper Swagger @ApiProperty decorators.
+    - Always include a task for updating controller Swagger decorators (@ApiOperation, @ApiTags).
+    - Always include a task for writing unit/e2e tests.
