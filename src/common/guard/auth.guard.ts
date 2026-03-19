@@ -11,6 +11,8 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { API_PUBLIC } from '@/common/constants/decoratorKey';
 import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
+import { ADMIN_AUTH_KEY } from '@/common/decorators/admin-auth.decorator';
+
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
@@ -24,17 +26,29 @@ export class AuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
+    const isAdminAuth = this.reflector.getAllAndOverride<boolean>(
+      ADMIN_AUTH_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+
     if (isPublic) {
       // 如果是公共接口，则跳过校验
       return true;
     }
-    if (!request) {
+    if (!request || !request.headers.authorization) {
       return false;
     }
     const token = request.headers.authorization.split(' ')[1];
     let payload: any;
     try {
-      payload = this.jwtService.verify(token);
+      if (isAdminAuth) {
+        payload = this.jwtService.verify(token, {
+          secret: process.env.ADMIN_JWT_SECRET || 'nest_admin_secret',
+          algorithms: ['HS256'],
+        });
+      } else {
+        payload = this.jwtService.verify(token);
+      }
       const userId = payload?.userId;
       const context = this.alsService.getStore();
       if (userId && context) {

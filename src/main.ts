@@ -19,14 +19,12 @@ async function bootstrap() {
 
   // swagger
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('API Documentation')
-    .setDescription('学习平台接口文档')
-    .setVersion('0.1')
+    .setTitle('学习平台 - API 接口文档')
+    .setDescription('提供学习平台的后端接口说明与调试。')
+    .setVersion('1.0')
     .build();
-  const documentFactory = () =>
-    SwaggerModule.createDocument(app, swaggerConfig);
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api', app, documentFactory);
+  SwaggerModule.setup('api', app, document);
 
   await app.listen(port ?? 3001);
   console.log(`Application is running on: ${await app.getUrl()}`);

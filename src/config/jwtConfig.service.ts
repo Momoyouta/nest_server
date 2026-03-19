@@ -12,8 +12,6 @@ export class JwtConfigService implements JwtOptionsFactory {
     // 在构造函数中读取，避免每次调用都读取文件
     const priKeyPath = join('src/common/constants/private.key');
     const pubKeyPath = join('src/common/constants/public.key');
-    console.log('私钥路径:', priKeyPath);
-    console.log('公钥路径:', pubKeyPath);
     // 检查文件是否存在
     if (!fs.existsSync(priKeyPath)) {
       throw new Error(`私钥文件不存在: ${priKeyPath}`);
@@ -31,7 +29,7 @@ export class JwtConfigService implements JwtOptionsFactory {
       publicKey: this.publicKey,
       signOptions: {
         algorithm: 'RS256', // 算法
-        expiresIn: '30s', // 过期时间
+        expiresIn: '1h', // 过期时间
         issuer: 'momo', // 签发者
         audience: 'client', // 接收者
       },

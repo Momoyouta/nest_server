@@ -7,7 +7,8 @@ import { Repository, In } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { RegisterUserDto } from '@/modules/auth/dto/RegisterUserDto.dto';
 import { TokenPayloadDto } from '@/modules/auth/dto/TokenPayload.dto';
-import { BaseUserInfo } from '@/modules/auth/dto/AuthResponse.dto';
+import { BaseUserInfo } from '@/modules/auth/dto/BaseUserInfo.dto';
+import { AdminRoleValues } from '@/common/utils/role.map';
 
 @Injectable()
 export class AuthService {
@@ -18,7 +19,7 @@ export class AuthService {
     private userRepository: Repository<User>,
     @InjectRepository(Role)
     private roleRepository: Repository<Role>,
-  ) {}
+  ) { }
 
   async login(pwd: string, account: string) {
     const user = await this.userRepository.findOne({
@@ -125,6 +126,111 @@ export class AuthService {
       };
     } catch (e) {
       throw new HttpException('token无效或已过期', HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  async adminLogin(pwd: string, account: string) {
+    const user = await this.userRepository.findOne({
+      where: {
+        account: account,
+      },
+    });
+    if (!user) {
+      throw new HttpException('该账号不存在', HttpStatus.BAD_REQUEST);
+    }
+    const cppwd = await this.comparePassword(pwd, user.password);
+    if (!cppwd) {
+      throw new HttpException('密码错误', HttpStatus.BAD_REQUEST);
+    }
+
+    const userRoleIds = user.role_id ? user.role_id.split(',') : [];
+    const hasAdminRole = userRoleIds.some((roleId) =>
+      AdminRoleValues.includes(roleId),
+    );
+    if (!hasAdminRole) {
+      throw new HttpException('该账号无管理员权限', HttpStatus.FORBIDDEN);
+    }
+
+    return await this.generateAdminAuthResponse(user);
+  }
+
+  async adminRegister(registerUserDto: RegisterUserDto) {
+    const { account, password } = registerUserDto;
+    const user = await this.userRepository.findOne({
+      select: {
+        account: true,
+      },
+      where: {
+        account: account,
+      },
+    });
+    if (user) {
+      throw new HttpException('该账号已存在', HttpStatus.BAD_REQUEST);
+    }
+    registerUserDto.id = User.generateId();
+    registerUserDto.password = await this.hashPassword(password);
+    await this.userRepository.save(registerUserDto);
+    return await this.generateAdminAuthResponse(
+      Object.assign(new User(), registerUserDto),
+    );
+  }
+
+  async generateAdminAuthResponse(user: User) {
+    const roles = await this.roleRepository.find({
+      select: { nameEN: true },
+      where: {
+        id: In(user.role_id.split(',')),
+      },
+    });
+    const userRoles = roles.map((role) => role.nameEN);
+
+    const tokenPayload: TokenPayloadDto = {
+      userId: user.id,
+      roleIds: user.role_id,
+      roles: userRoles,
+    };
+    const token = await this.jwtService.signAsync(
+      { ...tokenPayload },
+      {
+        secret: process.env.ADMIN_JWT_SECRET || 'nest_admin_secret',
+        expiresIn: '1d',
+        algorithm: 'HS256',
+      },
+    );
+
+    return {
+      token,
+      baseUserInfo: {
+        userId: user.id,
+        userRoles: userRoles,
+        userName: user.name,
+      } as BaseUserInfo,
+    };
+  }
+
+  async adminVerifyToken(token: string): Promise<BaseUserInfo> {
+    try {
+      const payload = await this.jwtService.verifyAsync(token, {
+        secret: process.env.ADMIN_JWT_SECRET || 'nest_admin_secret',
+        algorithms: ['HS256'],
+      });
+      // Fetch user name to complete baseUserInfo
+      const user = await this.userRepository.findOne({
+        where: { id: payload.userId },
+        select: { name: true },
+      });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      return {
+        userId: payload.userId,
+        userRoles: payload.roles,
+        userName: user.name,
+      };
+    } catch (e) {
+      throw new HttpException('管理员token无效或已过期', HttpStatus.BAD_REQUEST);
     }
   }
 }
