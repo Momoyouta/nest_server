@@ -12,6 +12,8 @@ import { AuthGuard } from '@/common/guard/auth.guard';
 import { RequestContextMiddlewareMiddleware } from '@/common/middleware/request-context-middleware/request-context-middleware.middleware';
 import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
 import { RoleGuard } from './common/guard/role.guard';
+import { SchoolModule } from './modules/school/school.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -35,6 +37,7 @@ import { RoleGuard } from './common/guard/role.guard';
     UserModule,
     CommonModule,
     AuthModule,
+    SchoolModule,
   ],
   controllers: [AppController],
   providers: [
@@ -43,7 +46,6 @@ import { RoleGuard } from './common/guard/role.guard';
       provide: APP_GUARD,
       useClass: AuthGuard,
     },
-    AsyncLocalstorageService,
   ],
 })
 export class AppModule implements NestModule {

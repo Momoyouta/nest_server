@@ -11,7 +11,7 @@ export class RoleGuard implements CanActivate {
     private reflector: Reflector,
     private readonly userService: UserService,
     private alsService: AsyncLocalstorageService,
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // 获取装饰器定义的角色要求 (例如: @Role('admin'))
@@ -23,17 +23,19 @@ export class RoleGuard implements CanActivate {
     if (!role || role.length === 0) {
       return true;
     }
-
     if (userId) {
       // 通过 UserService 查询用户的角色详细信息
       const userRoles = await this.userService.getUserRole(userId);
-      // 将角色实体数组映射为角色英文标识字符串数组 (nameEN)
-      const userRoleNames = userRoles.map((r) => r.nameEN);
-
-      // 使用 lodash.intersection 判断用户角色与接口要求角色是否有交集
-      return _.intersection(userRoleNames, role).length > 0;
+      // 将角色实体映射为包含 ID 和 nameEN 的标识数组
+      const userRoleIdentifiers = _.flatten(
+        userRoles.map((r) => [r.id.toString(), r.nameEN]),
+      );
+      console.log('Required roles:', role);
+      console.log('User role identifiers:', userRoleIdentifiers);
+      // 使用 lodash.intersection 判断用户角色标识与接口要求角色是否有交集
+      return _.intersection(userRoleIdentifiers, role).length > 0;
     }
-
+    console.log(role, userId)
     // 若未登录或无 userId，则禁止访问
     return false;
   }

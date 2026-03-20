@@ -19,7 +19,7 @@ export class AuthGuard implements CanActivate {
     private readonly jwtService: JwtService,
     private reflector: Reflector,
     private alsService: AsyncLocalstorageService,
-  ) {}
+  ) { }
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
     const isPublic = this.reflector.getAllAndOverride<boolean>(API_PUBLIC, [
@@ -54,10 +54,8 @@ export class AuthGuard implements CanActivate {
       if (userId && context) {
         context.userId = payload.userId;
       }
-      console.log(payload, 'payload');
       return true;
     } catch (e) {
-      console.log('payload: ', e);
       if (e.name === 'TokenExpiredError') {
         throw new HttpException(
           '令牌已过期，请重新登录',
