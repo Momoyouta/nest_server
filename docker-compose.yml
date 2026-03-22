@@ -13,6 +13,15 @@ services:
       - ./mysql/init:/docker-entrypoint-initdb.d:ro
     ports:
       - "3306:3306"
+  redis:
+    image: redis:7-alpine
+    container_name: redis_server
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis/data:/data
+    command: redis-server --requirepass root
   nestjs-server:
     build: 
       context: ./nest_server  # 重点：指向 nest_server 文件夹

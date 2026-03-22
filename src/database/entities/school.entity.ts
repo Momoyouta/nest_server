@@ -3,9 +3,9 @@ import { ApiProperty } from '@nestjs/swagger';
 
 @Entity('school')
 export class School {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn('uuid')
   @ApiProperty({ description: '学校ID' })
-  id: number;
+  id: string;
 
   @Column({ type: 'varchar', length: 20, nullable: true })
   @ApiProperty({ description: '创建时间戳 (s)', required: false })

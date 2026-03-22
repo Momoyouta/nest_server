@@ -13,6 +13,9 @@ import { RequestContextMiddlewareMiddleware } from '@/common/middleware/request-
 import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
 import { RoleGuard } from './common/guard/role.guard';
 import { SchoolModule } from './modules/school/school.module';
+import { StudentModule } from './modules/student/student.module';
+import { TeacherModule } from './modules/teacher/teacher.module';
+import { SchoolAdminModule } from './modules/school_admin/school_admin.module';
 
 @Module({
   imports: [
@@ -38,6 +41,9 @@ import { SchoolModule } from './modules/school/school.module';
     CommonModule,
     AuthModule,
     SchoolModule,
+    StudentModule,
+    TeacherModule,
+    SchoolAdminModule,
   ],
   controllers: [AppController],
   providers: [

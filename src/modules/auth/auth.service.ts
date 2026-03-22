@@ -8,7 +8,11 @@ import * as bcrypt from 'bcrypt';
 import { RegisterUserDto } from '@/modules/auth/dto/RegisterUserDto.dto';
 import { TokenPayloadDto } from '@/modules/auth/dto/TokenPayload.dto';
 import { BaseUserInfo } from '@/modules/auth/dto/BaseUserInfo.dto';
-import { AdminRoleValues } from '@/common/utils/role.map';
+import { AdminRoleValues, AdminRolesMap } from '@/common/utils/role.map';
+import { DataSource } from 'typeorm';
+import { Student } from '@/database/entities/student.entity';
+import { Teacher } from '@/database/entities/teacher.entity';
+import { SchoolAdmin } from '@/database/entities/school_admin.entity';
 
 @Injectable()
 export class AuthService {
@@ -19,6 +23,7 @@ export class AuthService {
     private userRepository: Repository<User>,
     @InjectRepository(Role)
     private roleRepository: Repository<Role>,
+    private readonly dataSource: DataSource,
   ) { }
 
   async login(pwd: string, account: string) {
@@ -52,6 +57,9 @@ export class AuthService {
     }
     registerUserDto.id = User.generateId();
     registerUserDto.password = await this.hashPassword(password);
+    const now = String(Math.floor(Date.now() / 1000));
+    (registerUserDto as any).create_time = now;
+    (registerUserDto as any).update_time = now;
     await this.userRepository.save(registerUserDto);
     return await this.generateAuthResponse(
       Object.assign(new User(), registerUserDto),
@@ -92,12 +100,26 @@ export class AuthService {
     };
     const token = await this.jwtService.signAsync({ ...tokenPayload });
 
+    let schoolId: string | undefined = undefined;
+    const roleIdArr = user.role_id ? user.role_id.split(',') : [];
+    if (roleIdArr.includes(AdminRolesMap.student)) {
+      const student = await this.dataSource.getRepository(Student).findOne({ where: { user_id: user.id } });
+      if (student?.school_id) schoolId = String(student.school_id);
+    } else if (roleIdArr.includes(AdminRolesMap.teacher)) {
+      const teacher = await this.dataSource.getRepository(Teacher).findOne({ where: { user_id: user.id } });
+      if (teacher?.school_id) schoolId = String(teacher.school_id);
+    } else if (roleIdArr.includes(AdminRolesMap.school_admin) || roleIdArr.includes(AdminRolesMap.school_root)) {
+      const schoolAdmin = await this.dataSource.getRepository(SchoolAdmin).findOne({ where: { user_id: user.id } });
+      if (schoolAdmin?.school_id) schoolId = String(schoolAdmin.school_id);
+    }
+
     return {
       token,
       baseUserInfo: {
         userId: user.id,
         userRoles: userRoles,
         userName: user.name,
+        schoolId: schoolId,
       } as BaseUserInfo,
     };
   }
@@ -119,10 +141,24 @@ export class AuthService {
         throw new Error('User not found');
       }
 
+      let schoolId: string | undefined = undefined;
+      const roleIdArr = payload.roleIds ? payload.roleIds.split(',') : [];
+      if (roleIdArr.includes(AdminRolesMap.student)) {
+        const student = await this.dataSource.getRepository(Student).findOne({ where: { user_id: payload.userId } });
+        if (student?.school_id) schoolId = String(student.school_id);
+      } else if (roleIdArr.includes(AdminRolesMap.teacher)) {
+        const teacher = await this.dataSource.getRepository(Teacher).findOne({ where: { user_id: payload.userId } });
+        if (teacher?.school_id) schoolId = String(teacher.school_id);
+      } else if (roleIdArr.includes(AdminRolesMap.school_admin) || roleIdArr.includes(AdminRolesMap.school_root)) {
+        const schoolAdmin = await this.dataSource.getRepository(SchoolAdmin).findOne({ where: { user_id: payload.userId } });
+        if (schoolAdmin?.school_id) schoolId = String(schoolAdmin.school_id);
+      }
+
       return {
         userId: payload.userId,
         userRoles: payload.roles,
         userName: user.name,
+        schoolId: schoolId,
       };
     } catch (e) {
       throw new HttpException('token无效或已过期', HttpStatus.BAD_REQUEST);
@@ -169,6 +205,10 @@ export class AuthService {
     }
     registerUserDto.id = User.generateId();
     registerUserDto.password = await this.hashPassword(password);
+    registerUserDto.status = 2;
+    const now = String(Math.floor(Date.now() / 1000));
+    (registerUserDto as any).create_time = now;
+    (registerUserDto as any).update_time = now;
     await this.userRepository.save(registerUserDto);
     return await this.generateAdminAuthResponse(
       Object.assign(new User(), registerUserDto),
@@ -198,12 +238,26 @@ export class AuthService {
       },
     );
 
+    let schoolId: string | undefined = undefined;
+    const roleIdArr = user.role_id ? user.role_id.split(',') : [];
+    if (roleIdArr.includes(AdminRolesMap.student)) {
+      const student = await this.dataSource.getRepository(Student).findOne({ where: { user_id: user.id } });
+      if (student?.school_id) schoolId = String(student.school_id);
+    } else if (roleIdArr.includes(AdminRolesMap.teacher)) {
+      const teacher = await this.dataSource.getRepository(Teacher).findOne({ where: { user_id: user.id } });
+      if (teacher?.school_id) schoolId = String(teacher.school_id);
+    } else if (roleIdArr.includes(AdminRolesMap.school_admin) || roleIdArr.includes(AdminRolesMap.school_root)) {
+      const schoolAdmin = await this.dataSource.getRepository(SchoolAdmin).findOne({ where: { user_id: user.id } });
+      if (schoolAdmin?.school_id) schoolId = String(schoolAdmin.school_id);
+    }
+
     return {
       token,
       baseUserInfo: {
         userId: user.id,
         userRoles: userRoles,
         userName: user.name,
+        schoolId: schoolId,
       } as BaseUserInfo,
     };
   }
@@ -224,10 +278,24 @@ export class AuthService {
         throw new Error('User not found');
       }
 
+      let schoolId: string | undefined = undefined;
+      const roleIdArr = payload.roleIds ? payload.roleIds.split(',') : [];
+      if (roleIdArr.includes(AdminRolesMap.student)) {
+        const student = await this.dataSource.getRepository(Student).findOne({ where: { user_id: payload.userId } });
+        if (student?.school_id) schoolId = String(student.school_id);
+      } else if (roleIdArr.includes(AdminRolesMap.teacher)) {
+        const teacher = await this.dataSource.getRepository(Teacher).findOne({ where: { user_id: payload.userId } });
+        if (teacher?.school_id) schoolId = String(teacher.school_id);
+      } else if (roleIdArr.includes(AdminRolesMap.school_admin) || roleIdArr.includes(AdminRolesMap.school_root)) {
+        const schoolAdmin = await this.dataSource.getRepository(SchoolAdmin).findOne({ where: { user_id: payload.userId } });
+        if (schoolAdmin?.school_id) schoolId = String(schoolAdmin.school_id);
+      }
+
       return {
         userId: payload.userId,
         userRoles: payload.roles,
         userName: user.name,
+        schoolId: schoolId,
       };
     } catch (e) {
       throw new HttpException('管理员token无效或已过期', HttpStatus.BAD_REQUEST);

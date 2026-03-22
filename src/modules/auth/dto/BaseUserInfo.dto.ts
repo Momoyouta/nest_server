@@ -9,4 +9,7 @@ export class BaseUserInfo {
 
   @ApiProperty({ description: '用户名称', example: '张三' })
   userName: string;
+
+  @ApiProperty({ description: '学校ID', example: '1', required: false })
+  schoolId?: string;
 }

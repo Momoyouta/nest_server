@@ -39,7 +39,7 @@ export class SchoolService {
     return { list, total };
   }
 
-  async findOne(id: number): Promise<School> {
+  async findOne(id: string): Promise<School> {
     const school = await this.schoolRepository.findOneBy({ id });
     if (!school) {
       throw new NotFoundException('学校不存在');
@@ -47,7 +47,8 @@ export class SchoolService {
     return school;
   }
 
-  async update(id: number, updateSchoolDto: UpdateSchoolDto): Promise<School> {
+  async update(id: string, updateSchoolDto: UpdateSchoolDto): Promise<School> {
+    (updateSchoolDto as any).update_time = String(Math.floor(Date.now() / 1000));
     const result = await this.schoolRepository.update(id, updateSchoolDto);
     if (result.affected === 0) {
       throw new NotFoundException('学校不存在');
@@ -58,7 +59,7 @@ export class SchoolService {
   /**
    * 软删除：将状态设置为禁用 (2)
    */
-  async softDelete(id: number): Promise<{ code: number; message: string }> {
+  async softDelete(id: string): Promise<{ code: number; message: string }> {
     const result = await this.schoolRepository.update(id, {
       status: SchoolStatusMap.DISABLED,
     });
@@ -68,7 +69,7 @@ export class SchoolService {
     return { code: 200, message: '禁用成功' };
   }
 
-  async remove(id: number): Promise<{ code: number; message: string }> {
+  async remove(id: string): Promise<{ code: number; message: string }> {
     const result = await this.schoolRepository.delete(id);
     if (result.affected === 0) {
       throw new NotFoundException('学校不存在');

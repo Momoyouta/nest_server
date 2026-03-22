@@ -59,7 +59,7 @@ export class SchoolController {
   @ApiOperation({ summary: '获取学校详情' })
   @ApiResponse({ status: 200, type: School })
   async findOne(@Param('id') id: string) {
-    const school = await this.schoolService.findOne(+id);
+    const school = await this.schoolService.findOne(id);
     return Result.success('查询成功', school);
   }
 
@@ -72,7 +72,7 @@ export class SchoolController {
     @Param('id') id: string,
     @Body() updateSchoolDto: UpdateSchoolDto,
   ) {
-    const school = await this.schoolService.update(+id, updateSchoolDto);
+    const school = await this.schoolService.update(id, updateSchoolDto);
     return Result.success('更新成功', school);
   }
 
@@ -82,7 +82,7 @@ export class SchoolController {
   @ApiOperation({ summary: '禁用学校 (软删除)' })
   @ApiResponse({ status: 200, description: '禁用成功' })
   async remove(@Param('id') id: string) {
-    const result = await this.schoolService.softDelete(+id);
+    const result = await this.schoolService.softDelete(id);
     return Result.success(result.message, null);
   }
 
@@ -92,7 +92,7 @@ export class SchoolController {
   @ApiOperation({ summary: '禁用学校 (硬删除)' })
   @ApiResponse({ status: 200, description: '禁用成功' })
   async removeHard(@Param('id') id: string) {
-    const result = await this.schoolService.remove(+id);
+    const result = await this.schoolService.remove(id);
     return Result.success(result.message, null);
   }
 }

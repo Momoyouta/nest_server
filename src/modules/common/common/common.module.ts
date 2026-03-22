@@ -5,7 +5,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '@/database/entities/user.entity';
 import { Role } from '@/database/entities/role.entity';
 import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
-const entities = [User, Role];
+import { Student } from '@/database/entities/student.entity';
+import { Teacher } from '@/database/entities/teacher.entity';
+import { SchoolAdmin } from '@/database/entities/school_admin.entity';
+import { School } from '@/database/entities/school.entity';
+
+const entities = [User, Role, Student, Teacher, SchoolAdmin, School];
 @Global()
 @Module({
   imports: [TypeOrmModule.forFeature(entities)],
