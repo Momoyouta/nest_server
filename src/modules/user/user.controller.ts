@@ -7,23 +7,62 @@ import {
   Body,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
+import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
+import { AdminRolesMap } from '@/common/utils/role.map';
+import * as _ from 'lodash';
 import { UserService } from './user.service';
 import { Result } from '@/database/types/result.type';
 import { ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
 import { UpdateUserRolesDto } from './dto/UpdateUserRolesDto.dto';
 import { Role } from '@/database/entities/role.entity';
 import { User } from '@/database/entities/user.entity';
+import { BaseQueryDto } from '@/common/dto/base-query.dto';
+import { AdminAuth } from '@/common/decorators/admin-auth.decorator';
+import { console } from 'inspector';
 
 @ApiTags('用户管理')
 @Controller('user')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly alsService: AsyncLocalstorageService,
+  ) { }
 
   @Get('hello')
   @ApiOperation({ summary: '测试接口' })
   public hello(): Result<string> {
     return Result.success('success', this.userService.getHello());
+  }
+
+  @Get()
+  @AdminAuth()
+  @ApiOperation({ summary: '分页获取用户列表' })
+  @ApiResponse({ status: 200, description: '成功返回用户列表' })
+  async findAll(@Query() query: BaseQueryDto) {
+    const { list, total } = await this.userService.findAll(query);
+    return Result.success('查询成功', { list, total });
+  }
+
+  @Put(':id')
+  @AdminAuth()
+  @ApiOperation({ summary: '修改用户信息' })
+  async update(@Param('id') id: string, @Body() body: any) {
+    const { userId } = this.alsService.getStore() || {};
+    if (!userId) throw new ForbiddenException('未登录');
+
+    // 权限校验：本人或管理员
+    const userRoles = await this.userService.getUserRole(userId);
+    const roleIds = userRoles.map(r => r.id.toString());
+    const isAdmin = _.intersection(roleIds, [AdminRolesMap.root, AdminRolesMap.admin]).length > 0;
+
+    if (!isAdmin && id !== userId) {
+      throw new ForbiddenException('没有权限修改他人的信息');
+    }
+
+    const res = await this.userService.updateUser(id, body);
+    return Result.success('更新成功', res);
   }
 
   @Get('findByIdOne/:id')

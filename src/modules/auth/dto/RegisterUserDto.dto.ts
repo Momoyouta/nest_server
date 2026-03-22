@@ -8,4 +8,7 @@ export class RegisterUserDto extends PickType(User, [
   'sex',
   'account',
   'password',
-] as const) {}
+] as const) {
+  inviteCode: string;
+  status: number;
+}
