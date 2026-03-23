@@ -16,6 +16,8 @@ import { SchoolModule } from './modules/school/school.module';
 import { StudentModule } from './modules/student/student.module';
 import { TeacherModule } from './modules/teacher/teacher.module';
 import { SchoolAdminModule } from './modules/school_admin/school_admin.module';
+import { RedisModule } from './modules/redis/redis.module';
+import { InvitationModule } from './modules/invitation/invitation.module';
 
 @Module({
   imports: [
@@ -44,6 +46,8 @@ import { SchoolAdminModule } from './modules/school_admin/school_admin.module';
     StudentModule,
     TeacherModule,
     SchoolAdminModule,
+    RedisModule,
+    InvitationModule
   ],
   controllers: [AppController],
   providers: [

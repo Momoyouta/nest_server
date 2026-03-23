@@ -4,7 +4,7 @@ import { BaseQueryDto } from '../../common/dto/base-query.dto';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Result } from '../../database/types/result.type';
 import { Role } from '../../common/decorators/role.decorator';
-import { AdminRolesMap } from '../../common/utils/role.map';
+import { AdminRoles, AdminRolesMap } from '../../common/utils/role.map';
 import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
 import { UserService } from '../user/user.service';
 import * as _ from 'lodash';
@@ -46,7 +46,7 @@ export class TeacherController {
     // 权限校验：本人或管理员
     const userRoles = await this.userService.getUserRole(userId);
     const roleIds = userRoles.map(r => r.id.toString());
-    const isAdmin = _.intersection(roleIds, [AdminRolesMap.root, AdminRolesMap.admin]).length > 0;
+    const isAdmin = _.intersection(roleIds, AdminRoles).length > 0;
 
     if (!isAdmin && teacher.user_id !== userId) {
       throw new ForbiddenException('没有权限修改他人的信息');
@@ -58,10 +58,10 @@ export class TeacherController {
 
   @Delete(':id')
   @AdminAuth()
-  @Role(AdminRolesMap.root, AdminRolesMap.admin)
+  @Role(...AdminRoles)
   @ApiOperation({ summary: '软删除教师' })
   async remove(@Param('id') id: string) {
     await this.teacherService.softDelete(id);
-    return Result.success('删除成功', null);
+    return Result.success('禁用成功', null);
   }
 }

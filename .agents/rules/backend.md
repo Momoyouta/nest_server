@@ -8,6 +8,6 @@ trigger: always_on
 - 区分管理端和用户端接口使用/src/common/decorators/admin-auth.decorator.ts，管理端用户端使用的jwt不同
 - @Role('')用于对接口进行权限控制
 - @isPublic()用于开放接口，不需要jwt验证
-- plan必须用中文编写
+- Implementation plan必须用中文编写
 - TypeOrmModule实体的注册在src/modules/common/common/common.module.ts下，通过const entities = [User, Role];来注册实体，不需要在其他地方TypeOrmModule.forFeature()
 - 创建、更新操作必须添加create_time、update_time 时间戳(s)，string

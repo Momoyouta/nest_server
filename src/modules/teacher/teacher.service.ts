@@ -17,12 +17,13 @@ export class TeacherService {
   ) { }
 
   async findAll(query: BaseQueryDto) {
-    const { page = 1, pageSize = 10, id, name, phone, school_id, teacher_number } = query as any;
+    const { page = 1, pageSize = 10, id, name, phone, school_id, teacher_number, status } = query as any;
     const qb = this.teacherRepository.createQueryBuilder('teacher');
     qb.leftJoinAndSelect('teacher.user', 'user');
 
-    qb.where('user.status = :status', { status: 1 });
-
+    if (status) {
+      qb.andWhere('user.status = :status', { status });
+    }
     if (id) {
       qb.andWhere('teacher.id = :id', { id });
     }
@@ -45,47 +46,46 @@ export class TeacherService {
     const [items, total] = await qb.getManyAndCount();
 
     const flatItems = items.map(item => {
-      const { user, ...rest } = item as any;
+      const { user, id: teacher_id, ...rest } = item as any;
       if (user) {
-        const { id: userId, ...userRest } = user;
-        return { ...rest, ...userRest };
+        return { teacher_id, ...rest, ...user };
       }
-      return rest;
+      return { teacher_id, ...rest };
     });
 
     return { items: flatItems, total };
   }
 
-  async findOne(id: string) {
+  async findOne(userId: string) {
     const teacher = await this.teacherRepository.findOne({
-      where: { id },
+      where: { user_id: userId },
       relations: ['user'],
     });
     if (!teacher) throw new NotFoundException('教师不存在');
     return teacher;
   }
 
-  async update(id: string, data: any) {
-    const teacher = await this.findOne(id);
+  async update(userId: string, data: any) {
+    const teacher = await this.findOne(userId);
     if (data.user) {
       if (data.user.password) {
         data.user.password = await bcrypt.hash(String(data.user.password), await bcrypt.genSalt(10));
       }
       data.user.update_time = String(Math.floor(Date.now() / 1000));
       await this.userRepository.update(teacher.user_id, data.user);
-      await this.teacherRepository.update(id, data.teacher || data);
+      await this.teacherRepository.update(teacher.id, data.teacher || data);
     } else {
       const userFields = this.userRepository.metadata.columns.map(c => c.propertyName);
       const userData: any = {};
       const teacherData: any = {};
-      
+
       const excludeFields = ['id', 'user_id', 'organization', 'roleNames', 'school_admin_id', 'institution', 'create_time', 'update_time', 'user'];
 
       const now = String(Math.floor(Date.now() / 1000));
       for (const ObjectKey of Object.keys(data)) {
         const key = ObjectKey;
         if (excludeFields.includes(key)) continue;
-        
+
         if (userFields.includes(key)) {
           if (key === 'password' && data[key]) {
             userData[key] = await bcrypt.hash(String(data[key]), await bcrypt.genSalt(10));
@@ -102,14 +102,14 @@ export class TeacherService {
         await this.userRepository.update(teacher.user_id, userData);
       }
       if (Object.keys(teacherData).length > 0) {
-        await this.teacherRepository.update(id, teacherData);
+        await this.teacherRepository.update(teacher.id, teacherData);
       }
     }
-    return this.findOne(id);
+    return this.findOne(userId);
   }
 
-  async softDelete(id: string) {
-    const teacher = await this.findOne(id);
+  async softDelete(userId: string) {
+    const teacher = await this.findOne(userId);
     await this.userRepository.update(teacher.user_id, { status: 2 });
     return { success: true };
   }

@@ -4,6 +4,7 @@ import { AuthController } from './auth.controller';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtConfigService } from '@/config/jwtConfig.service';
 import { UserModule } from '../user/user.module';
+import { InvitationModule } from '../invitation/invitation.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { UserModule } from '../user/user.module';
       useClass: JwtConfigService,
     }),
     UserModule,
+    InvitationModule,
   ],
   providers: [AuthService, JwtConfigService],
   controllers: [AuthController],

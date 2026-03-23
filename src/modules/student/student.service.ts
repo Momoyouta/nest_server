@@ -16,12 +16,13 @@ export class StudentService {
   ) { }
 
   async findAll(query: BaseQueryDto) {
-    const { page = 1, pageSize = 10, id, name, phone, school_id, student_number } = query as any;
+    const { page = 1, pageSize = 10, id, name, phone, school_id, student_number, status } = query as any;
     const qb = this.studentRepository.createQueryBuilder('student');
     qb.leftJoinAndSelect('student.user', 'user');
 
-    qb.where('user.status = :status', { status: 1 });
-
+    if (status) {
+      qb.andWhere('user.status = :status', { status });
+    }
     if (id) {
       qb.andWhere('student.id = :id', { id });
     }
@@ -44,35 +45,34 @@ export class StudentService {
     const [items, total] = await qb.getManyAndCount();
 
     const flatItems = items.map(item => {
-      const { user, ...rest } = item as any;
+      const { user, id: student_id, ...rest } = item as any;
       if (user) {
-        const { id: userId, ...userRest } = user;
-        return { ...rest, ...userRest };
+        return { student_id, ...rest, ...user };
       }
-      return rest;
+      return { student_id, ...rest };
     });
 
     return { items: flatItems, total };
   }
 
-  async findOne(id: string) {
+  async findOne(userId: string) {
     const student = await this.studentRepository.findOne({
-      where: { id },
+      where: { user_id: userId },
       relations: ['user'],
     });
     if (!student) throw new NotFoundException('学生不存在');
     return student;
   }
 
-  async update(id: string, data: any) {
-    const student = await this.findOne(id);
+  async update(userId: string, data: any) {
+    const student = await this.findOne(userId);
     if (data.user) {
       if (data.user.password) {
         data.user.password = await bcrypt.hash(String(data.user.password), await bcrypt.genSalt(10));
       }
       data.user.update_time = String(Math.floor(Date.now() / 1000));
       await this.userRepository.update(student.user_id, data.user);
-      await this.studentRepository.update(id, data.student || data);
+      await this.studentRepository.update(student.id, data.student || data);
     } else {
       const userFields = this.userRepository.metadata.columns.map(c => c.propertyName);
       const userData: any = {};
@@ -101,14 +101,14 @@ export class StudentService {
         await this.userRepository.update(student.user_id, userData);
       }
       if (Object.keys(studentData).length > 0) {
-        await this.studentRepository.update(id, studentData);
+        await this.studentRepository.update(student.id, studentData);
       }
     }
-    return this.findOne(id);
+    return this.findOne(userId);
   }
 
-  async softDelete(id: string) {
-    const student = await this.findOne(id);
+  async softDelete(userId: string) {
+    const student = await this.findOne(userId);
     await this.userRepository.update(student.user_id, { status: 2 });
     return { success: true };
   }
