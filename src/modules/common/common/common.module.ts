@@ -9,8 +9,9 @@ import { Student } from '@/database/entities/student.entity';
 import { Teacher } from '@/database/entities/teacher.entity';
 import { SchoolAdmin } from '@/database/entities/school_admin.entity';
 import { School } from '@/database/entities/school.entity';
+import { InvitationCode } from '@/database/entities/invitation_code.entity';
 
-const entities = [User, Role, Student, Teacher, SchoolAdmin, School];
+const entities = [User, Role, Student, Teacher, SchoolAdmin, School, InvitationCode];
 @Global()
 @Module({
   imports: [TypeOrmModule.forFeature(entities)],

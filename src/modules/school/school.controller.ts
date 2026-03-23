@@ -17,7 +17,7 @@ import { AdminAuth } from '@/common/decorators/admin-auth.decorator';
 import { Role } from '@/common/decorators/role.decorator';
 import { Result } from '@/database/types/result.type';
 import { School } from '@/database/entities/school.entity';
-import { PlatformAdmin } from '@/common/utils/role.map';
+import { PlatformAdminRoles } from '@/common/utils/role.map';
 
 @ApiTags('学校管理')
 
@@ -27,7 +27,7 @@ export class SchoolController {
 
   @Post('create')
   @AdminAuth()
-  @Role(...PlatformAdmin)
+  @Role(...PlatformAdminRoles)
   @ApiOperation({ summary: '创建学校' })
   @ApiResponse({ status: 201, type: School })
   async create(@Body() createSchoolDto: CreateSchoolDto) {
@@ -46,7 +46,7 @@ export class SchoolController {
 
   @Get()
   @AdminAuth()
-  @Role(...PlatformAdmin)
+  @Role(...PlatformAdminRoles)
   @ApiOperation({ summary: '分页获取学校列表' })
   @ApiResponse({ status: 200, description: '成功返回学校列表与总数' })
   async findAll(@Query() query: QuerySchoolDto) {
@@ -65,7 +65,7 @@ export class SchoolController {
 
   @Put(':id')
   @AdminAuth()
-  @Role(...PlatformAdmin, 'school_root')
+  @Role(...PlatformAdminRoles, 'school_root')
   @ApiOperation({ summary: '更新学校信息' })
   @ApiResponse({ status: 200, type: School })
   async update(
@@ -78,7 +78,7 @@ export class SchoolController {
 
   @Delete(':id')
   @AdminAuth()
-  @Role(...PlatformAdmin)
+  @Role(...PlatformAdminRoles)
   @ApiOperation({ summary: '禁用学校 (软删除)' })
   @ApiResponse({ status: 200, description: '禁用成功' })
   async remove(@Param('id') id: string) {
@@ -88,7 +88,7 @@ export class SchoolController {
 
   @Delete('/removeHard/:id')
   @AdminAuth()
-  @Role(...PlatformAdmin)
+  @Role(...PlatformAdminRoles)
   @ApiOperation({ summary: '禁用学校 (硬删除)' })
   @ApiResponse({ status: 200, description: '禁用成功' })
   async removeHard(@Param('id') id: string) {

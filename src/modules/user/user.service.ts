@@ -203,4 +203,69 @@ export class UserService {
     }
     return { code: 200, message: '更新成功' };
   }
+
+  /**
+   * 创建教师（包含用户基础信息）
+   */
+  async createTeacherWithUser(userData: Partial<User>, schoolId: string): Promise<User> {
+    return await this.dataSource.transaction(async (manager) => {
+      // 1. 创建用户
+      if (userData.password) {
+        userData.password = await bcrypt.hash(String(userData.password), await bcrypt.genSalt(10));
+      }
+      const now = String(Math.floor(Date.now() / 1000));
+      userData.create_time = now;
+      userData.update_time = now;
+      userData.role_id = AdminRolesMap.teacher;
+      userData.status = 1;
+
+      const user = manager.create(User, userData);
+      const savedUser = await manager.save(User, user);
+
+      // 2. 创建教师实体
+      const teacher = manager.create(Teacher, {
+        user_id: savedUser.id,
+        school_id: schoolId,
+      });
+      await manager.save(Teacher, teacher);
+
+      return savedUser;
+    });
+  }
+
+  /**
+   * 创建学生（包含用户基础信息）
+   */
+  async createStudentWithUser(
+    userData: Partial<User>,
+    schoolId: string,
+    grade?: string,
+    classId?: string,
+  ): Promise<User> {
+    return await this.dataSource.transaction(async (manager) => {
+      // 1. 创建用户
+      if (userData.password) {
+        userData.password = await bcrypt.hash(String(userData.password), await bcrypt.genSalt(10));
+      }
+      const now = String(Math.floor(Date.now() / 1000));
+      userData.create_time = now;
+      userData.update_time = now;
+      userData.role_id = AdminRolesMap.student;
+      userData.status = 1;
+
+      const user = manager.create(User, userData);
+      const savedUser = await manager.save(User, user);
+
+      // 2. 创建学生实体
+      const student = manager.create(Student, {
+        user_id: savedUser.id,
+        school_id: schoolId,
+        grade_id: grade,
+        class_id: classId,
+      });
+      await manager.save(Student, student);
+
+      return savedUser;
+    });
+  }
 }

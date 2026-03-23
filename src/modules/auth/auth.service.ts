@@ -13,6 +13,8 @@ import { DataSource } from 'typeorm';
 import { Student } from '@/database/entities/student.entity';
 import { Teacher } from '@/database/entities/teacher.entity';
 import { SchoolAdmin } from '@/database/entities/school_admin.entity';
+import { InvitationService } from '../invitation/invitation.service';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class AuthService {
@@ -24,6 +26,8 @@ export class AuthService {
     @InjectRepository(Role)
     private roleRepository: Repository<Role>,
     private readonly dataSource: DataSource,
+    private readonly invitationService: InvitationService,
+    private readonly userService: UserService,
   ) { }
 
   async login(pwd: string, account: string) {
@@ -35,6 +39,9 @@ export class AuthService {
     if (!user) {
       throw new HttpException('该账号不存在', HttpStatus.BAD_REQUEST);
     }
+    if (user.status !== 1) {
+      throw new HttpException('账号封禁中', HttpStatus.FORBIDDEN);
+    }
     const cppwd = await this.comparePassword(pwd, user.password);
     if (!cppwd) {
       throw new HttpException('密码错误', HttpStatus.BAD_REQUEST);
@@ -43,7 +50,14 @@ export class AuthService {
   }
 
   async register(registerUserDto: RegisterUserDto) {
-    const { account, password } = registerUserDto;
+    const { account, inviteCode, role_id } = registerUserDto;
+
+    // 1. 验证角色 (仅允许教师和学生)
+    if (role_id !== AdminRolesMap.teacher && role_id !== AdminRolesMap.student) {
+      throw new HttpException('该接口仅允许注册教师或学生', HttpStatus.BAD_REQUEST);
+    }
+
+    // 2. 账号唯一性检查
     const user = await this.userRepository.findOne({
       select: {
         account: true,
@@ -55,15 +69,39 @@ export class AuthService {
     if (user) {
       throw new HttpException('该账号已存在', HttpStatus.BAD_REQUEST);
     }
-    registerUserDto.id = User.generateId();
-    registerUserDto.password = await this.hashPassword(password);
-    const now = String(Math.floor(Date.now() / 1000));
-    (registerUserDto as any).create_time = now;
-    (registerUserDto as any).update_time = now;
-    await this.userRepository.save(registerUserDto);
-    return await this.generateAuthResponse(
-      Object.assign(new User(), registerUserDto),
-    );
+    registerUserDto.phone = registerUserDto.account;
+
+    // 3. 校验邀请码
+    const inviteData = await this.invitationService.getInviteData(inviteCode);
+    if (!inviteData) {
+      throw new HttpException('邀请码不存在或已过期', HttpStatus.BAD_REQUEST);
+    }
+
+    // 4. 校验邀请码类型与请求角色是否匹配 (0:老师, 1:学生)
+    if (role_id === AdminRolesMap.teacher && inviteData.type !== 0) {
+      throw new HttpException('邀请码类型与教师角色不匹配', HttpStatus.BAD_REQUEST);
+    }
+    if (role_id === AdminRolesMap.student && inviteData.type !== 1) {
+      throw new HttpException('邀请码类型与学生角色不匹配', HttpStatus.BAD_REQUEST);
+    }
+
+    // 5. 调用 UserService 进行创建
+    let savedUser: User;
+    if (role_id === AdminRolesMap.teacher) {
+      savedUser = await this.userService.createTeacherWithUser(
+        registerUserDto,
+        inviteData.school_id,
+      );
+    } else {
+      savedUser = await this.userService.createStudentWithUser(
+        registerUserDto,
+        inviteData.school_id,
+        inviteData.grade,
+        inviteData.class_id,
+      );
+    }
+
+    return await this.generateAuthResponse(savedUser);
   }
 
   /**
@@ -174,6 +212,9 @@ export class AuthService {
     if (!user) {
       throw new HttpException('该账号不存在', HttpStatus.BAD_REQUEST);
     }
+    if (user.status !== 1) {
+      throw new HttpException('账号封禁中', HttpStatus.FORBIDDEN);
+    }
     const cppwd = await this.comparePassword(pwd, user.password);
     if (!cppwd) {
       throw new HttpException('密码错误', HttpStatus.BAD_REQUEST);
@@ -205,6 +246,7 @@ export class AuthService {
     }
     registerUserDto.id = User.generateId();
     registerUserDto.password = await this.hashPassword(password);
+    registerUserDto.phone = registerUserDto.account;
     registerUserDto.status = 2;
     const now = String(Math.floor(Date.now() / 1000));
     (registerUserDto as any).create_time = now;

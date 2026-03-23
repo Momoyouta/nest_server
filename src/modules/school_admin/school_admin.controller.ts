@@ -41,6 +41,6 @@ export class SchoolAdminController {
   @ApiOperation({ summary: '删除学校管理员' })
   async remove(@Param('id') id: string) {
     await this.schoolAdminService.softDelete(id);
-    return Result.success('删除成功', null);
+    return Result.success('禁用成功', null);
   }
 }
