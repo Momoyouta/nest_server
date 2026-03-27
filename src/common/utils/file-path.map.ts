@@ -8,7 +8,7 @@ export const getFileStoreRoot = (): string => {
   const root = process.env.FILE_STORE_BASE_PATH;
   if (!root) {
     // 依然保留一个默认值，防止由于未配置导致的直接崩溃，仅在调用时报错或回退
-    return 'E:\\毕设\\fileStore'; 
+    return 'E:\\毕设\\fileStore';
   }
   return root;
 };
@@ -107,6 +107,9 @@ export const FilePathTemplate = {
   /** 全局用户头像目录 */
   userAvatars: () => resolvePath('users', 'avatars'),
 
+  /** 临时图片目录 */
+  tempImages: () => resolvePath('uploads', 'temp', 'images'),
+
   /** 分片上传临时目录 */
   chunkTemp: (fileHash: string) =>
     resolvePath('uploads', 'temp', 'chunks', fileHash),
@@ -115,3 +118,8 @@ export const FilePathTemplate = {
   chunkFile: (fileHash: string, chunkIndex: number) =>
     resolvePath('uploads', 'temp', 'chunks', fileHash, String(chunkIndex)),
 };
+
+export const FilePathMap = {
+  TEMP_IMG: 'uploads/temp/images',
+
+}

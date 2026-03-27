@@ -30,6 +30,8 @@ import { CreateSchoolDirDto } from './storage/dto/create-school-dir.dto';
 import { CreateCourseDirDto } from './storage/dto/create-course-dir.dto';
 import { CreateChapterLessonDirDto } from './storage/dto/create-chapter-lesson-dir.dto';
 import { CreateHomeworkDirDto } from './storage/dto/create-homework-dir.dto';
+import { FilePathMap, FilePathTemplate } from '@/common/utils/file-path.map';
+import { Public } from '@/common/decorators/auth.decorator';
 
 
 @ApiTags('文件管理')
@@ -65,6 +67,30 @@ export class FileController {
     @Body() dto: UploadImageDto,
   ) {
     const result = this.uploadService.saveImage(file, dto.target);
+    return { code: 200, msg: '上传成功', data: result };
+  }
+
+  @Post('upload/imageTemp')
+  @Public()
+  @ApiOperation({ summary: '上传临时图片（<5MB）' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: { type: 'string', format: 'binary', description: '图片文件' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: '上传成功，返回存储相对路径' })
+  @ApiResponse({ status: 413, description: '文件大小超过 5MB 限制' })
+  @ApiResponse({ status: 415, description: '不支持的文件类型' })
+  @UseInterceptors(FileInterceptor('file'))
+  uploadImageTemp(
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const result = this.uploadService.saveImage(file, FilePathMap.TEMP_IMG);
     return { code: 200, msg: '上传成功', data: result };
   }
 

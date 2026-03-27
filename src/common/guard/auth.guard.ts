@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
-import { API_PUBLIC } from '@/common/constants/decoratorKey';
+import { ALL_JWT_AUTH, API_PUBLIC } from '@/common/constants/decoratorKey';
 import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
 import { ADMIN_AUTH_KEY } from '@/common/decorators/admin-auth.decorator';
 
@@ -23,6 +23,10 @@ export class AuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
     const isPublic = this.reflector.getAllAndOverride<boolean>(API_PUBLIC, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    const allowAllJwtAuth = this.reflector.getAllAndOverride<boolean>(ALL_JWT_AUTH, [
       context.getHandler(),
       context.getClass(),
     ]);
@@ -56,6 +60,19 @@ export class AuthGuard implements CanActivate {
       }
       return true;
     } catch (e) {
+      if (allowAllJwtAuth) {
+        try {
+          payload = this.jwtService.verify(token);
+          const userId = payload?.userId;
+          const context = this.alsService.getStore();
+          if (userId && context) {
+            context.userId = payload.userId;
+          }
+          return true;
+        } catch (e2) {
+          throw new HttpException('令牌无效，请检查', HttpStatus.UNAUTHORIZED);
+        }
+      }
       if (e.name === 'TokenExpiredError') {
         throw new HttpException(
           '令牌已过期，请重新登录',

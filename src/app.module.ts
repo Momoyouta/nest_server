@@ -10,8 +10,6 @@ import { AuthModule } from '@/modules/auth/auth.module';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from '@/common/guard/auth.guard';
 import { RequestContextMiddlewareMiddleware } from '@/common/middleware/request-context-middleware/request-context-middleware.middleware';
-import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
-import { RoleGuard } from './common/guard/role.guard';
 import { SchoolModule } from './modules/school/school.module';
 import { StudentModule } from './modules/student/student.module';
 import { TeacherModule } from './modules/teacher/teacher.module';
@@ -19,6 +17,10 @@ import { SchoolAdminModule } from './modules/school_admin/school_admin.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { InvitationModule } from './modules/invitation/invitation.module';
 import { FileModule } from './modules/file/file.module';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { getFileStoreRoot } from '@/common/utils/file-path.map';
+
+const isDevEnv = (process.env.NODE_ENV || 'dev') === 'dev';
 
 @Module({
   imports: [
@@ -49,7 +51,18 @@ import { FileModule } from './modules/file/file.module';
     SchoolAdminModule,
     RedisModule,
     InvitationModule,
-    FileModule
+    FileModule,
+    ...(isDevEnv
+      ? [
+          ServeStaticModule.forRoot({
+            rootPath: getFileStoreRoot(),
+            serveRoot: '/fileStore',
+            serveStaticOptions: {
+              index: false,
+            },
+          }),
+        ]
+      : []),
   ],
   controllers: [AppController],
   providers: [
