@@ -38,6 +38,8 @@ services:
       DB_USERNAME: root
       DB_PASSWORD: root
       DB_NAME: study_platform
+    volumes:
+      - ./fileStore:/usr/src/app/fileStore:rw
   nginx:
     image: nginx:alpine
     container_name: nginx_server
@@ -46,8 +48,9 @@ services:
       - "80:80"    # 暴露宿主机的 80 端口
     volumes:
       # 1. 挂载前端打包好的静态文件到 Nginx 的默认 web 目录
-      - ./vite-app/dist:/usr/share/nginx/html/client
-      - ./vite-admin-app/dist:/usr/share/nginx/html/admin
+      - ./vite-app/dist:/usr/share/nginx/html/client:ro
+      - ./vite-admin-app/dist:/usr/share/nginx/html/admin:ro
+      - ./fileStore:/usr/share/nginx/html/fileStore:ro
       # 2. 挂载 Nginx 配置文件
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:

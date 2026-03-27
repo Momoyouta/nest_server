@@ -10,8 +10,9 @@ import { Teacher } from '@/database/entities/teacher.entity';
 import { SchoolAdmin } from '@/database/entities/school_admin.entity';
 import { School } from '@/database/entities/school.entity';
 import { InvitationCode } from '@/database/entities/invitation_code.entity';
+import { FileChunk } from '@/modules/file/chunk/chunk.entity';
 
-const entities = [User, Role, Student, Teacher, SchoolAdmin, School, InvitationCode];
+const entities = [User, Role, Student, Teacher, SchoolAdmin, School, InvitationCode, FileChunk];
 @Global()
 @Module({
   imports: [TypeOrmModule.forFeature(entities)],
