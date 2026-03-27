@@ -343,4 +343,18 @@ export class AuthService {
       throw new HttpException('管理员token无效或已过期', HttpStatus.BAD_REQUEST);
     }
   }
+
+  async validateTokenForFile(token: string): Promise<BaseUserInfo> {
+    try {
+      // 先验证普通用户的
+      return await this.verifyToken(token);
+    } catch (e) {
+      try {
+        // 再验证管理员的
+        return await this.adminVerifyToken(token);
+      } catch (e2) {
+        throw new HttpException('鉴权失败', HttpStatus.UNAUTHORIZED);
+      }
+    }
+  }
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Get, Headers, HttpException, HttpStatus } from '@nestjs/common';
 import { AuthService } from '@/modules/auth/auth.service';
 import { Result } from '@/database/types/result.type';
 import { RegisterUserDto } from '@/modules/auth/dto/RegisterUserDto.dto';
@@ -84,5 +84,22 @@ export class AuthController {
   async adminJwtAuth(@Body('accessToken') accessToken: string) {
     const baseUserInfo = await this.authService.adminVerifyToken(accessToken);
     return Result.success('Token有效', { valid: true, baseUserInfo });
+  }
+
+  @Public()
+  @Get('checkFilePermission')
+  @ApiOperation({ summary: '静态资源鉴权 (Nginx auth_request)' })
+  @ApiResponse({ status: 200, description: '鉴权成功' })
+  @ApiResponse({ status: 401, description: '鉴权失败' })
+  async checkFilePermission(@Headers('authorization') authHeader: string) {
+    if (!authHeader) {
+      throw new HttpException('未提供认证信息', HttpStatus.UNAUTHORIZED);
+    }
+    const token = authHeader.split(' ')[1];
+    if (!token) {
+      throw new HttpException('认证格式错误', HttpStatus.UNAUTHORIZED);
+    }
+    await this.authService.validateTokenForFile(token);
+    return Result.success('鉴权通过', null);
   }
 }
