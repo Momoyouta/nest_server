@@ -29,7 +29,7 @@ export class JwtConfigService implements JwtOptionsFactory {
       publicKey: this.publicKey,
       signOptions: {
         algorithm: 'RS256', // 算法
-        expiresIn: '1h', // 过期时间
+        expiresIn: '12h', // 过期时间
         issuer: 'momo', // 签发者
         audience: 'client', // 接收者
       },

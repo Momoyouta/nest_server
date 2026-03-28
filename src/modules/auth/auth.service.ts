@@ -15,6 +15,7 @@ import { Teacher } from '@/database/entities/teacher.entity';
 import { SchoolAdmin } from '@/database/entities/school_admin.entity';
 import { InvitationService } from '../invitation/invitation.service';
 import { UserService } from '../user/user.service';
+import { CurrentUserProfile } from '../user/dto/CurrentUserProfile.dto';
 
 @Injectable()
 export class AuthService {
@@ -137,29 +138,21 @@ export class AuthService {
       roles: userRoles,
     };
     const token = await this.jwtService.signAsync({ ...tokenPayload });
-
-    let schoolId: string | undefined = undefined;
-    const roleIdArr = user.role_id ? user.role_id.split(',') : [];
-    if (roleIdArr.includes(AdminRolesMap.student)) {
-      const student = await this.dataSource.getRepository(Student).findOne({ where: { user_id: user.id } });
-      if (student?.school_id) schoolId = String(student.school_id);
-    } else if (roleIdArr.includes(AdminRolesMap.teacher)) {
-      const teacher = await this.dataSource.getRepository(Teacher).findOne({ where: { user_id: user.id } });
-      if (teacher?.school_id) schoolId = String(teacher.school_id);
-    } else if (roleIdArr.includes(AdminRolesMap.school_admin) || roleIdArr.includes(AdminRolesMap.school_root)) {
-      const schoolAdmin = await this.dataSource.getRepository(SchoolAdmin).findOne({ where: { user_id: user.id } });
-      if (schoolAdmin?.school_id) schoolId = String(schoolAdmin.school_id);
-    }
+    const userProfile = await this.userService.getSelfProfileInfo(user.id);
 
     return {
       token,
-      baseUserInfo: {
-        userId: user.id,
-        userRoles: userRoles,
-        userName: user.name,
-        schoolId: schoolId,
-      } as BaseUserInfo,
+      userProfile,
     };
+  }
+
+  async verifyTokenWithProfile(token: string): Promise<CurrentUserProfile> {
+    try {
+      const payload = await this.jwtService.verifyAsync<TokenPayloadDto>(token);
+      return await this.userService.getSelfProfileInfo(String(payload.userId));
+    } catch {
+      throw new HttpException('token无效或已过期', HttpStatus.FORBIDDEN);
+    }
   }
 
   /**

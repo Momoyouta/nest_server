@@ -1,6 +1,9 @@
 {
   "geminicodeassist.codeGenerationPaneViewEnabled": false,
   "http.proxy": "http://127.0.0.1:7980",
-  "http.proxyStrictSSL": false
+  "http.proxyStrictSSL": false,
+  "chat.tools.terminal.autoApprove": {
+    "openspec": true
+  }
 
 }

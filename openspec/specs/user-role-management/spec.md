@@ -1,5 +1,8 @@
-## ADDED Requirements
+# user-role-management Specification
 
+## Purpose
+TBD - created by archiving change add-user-role-management. Update Purpose after archive.
+## Requirements
 ### Requirement: 获取用户角色列表 (Query User Roles)
 系统 MUST 允许通过用户 ID 查询该用户关联的所有角色详细信息。
 
@@ -21,3 +24,4 @@
 #### Scenario: 角色 ID 验证失败
 - **WHEN** 调用 `PUT /user/roles/:id` 提供非数组或无效格式的 ID
 - **THEN** 系统应返回 HTTP 400 Bad Request，并指出校验错误
+

@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository, DataSource } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
@@ -9,8 +15,21 @@ import { SchoolAdmin } from '@/database/entities/school_admin.entity';
 import { School } from '@/database/entities/school.entity';
 import { AdminRolesMap } from '@/common/utils/role.map';
 import { BaseQueryDto } from '@/common/dto/base-query.dto';
-import { console } from 'inspector';
+import {
+  CurrentUserInfoDto,
+  CurrentStudentInfoDto,
+  CurrentTeacherInfoDto,
+  CurrentUserProfile,
+} from './dto/CurrentUserProfile.dto';
 import * as bcrypt from 'bcrypt';
+import { Redis } from 'ioredis';
+import * as fs from 'fs';
+import * as path from 'path';
+import {
+  FilePathTemplate,
+  getFileStoreRoot,
+} from '@/common/utils/file-path.map';
+import { UserProfileMap } from '@/common/utils/user-profile.map';
 
 @Injectable()
 export class UserService {
@@ -20,9 +39,11 @@ export class UserService {
     @InjectRepository(Role)
     private roleRepository: Repository<Role>,
     private readonly dataSource: DataSource,
-  ) { }
+    @Inject('REDIS_CLIENT')
+    private readonly redis: Redis,
+  ) {}
 
-  login(): any { }
+  login(): any {}
 
   async findAll(query: BaseQueryDto) {
     const { page = 1, pageSize = 10, id, name, account, phone, role_id } = query as any;
@@ -190,6 +211,209 @@ export class UserService {
     });
   }
 
+  async getSelfProfileInfo(id: string): Promise<CurrentUserProfile> {
+    const user = await this.usersRepository.findOneBy({ id });
+    if (!user) {
+      throw new NotFoundException('用户不存在');
+    }
+
+    const roles = await this.getUserRolesDetails(id);
+    const roleIds = roles.map((role) => String(role.id));
+
+    let teacherInfo: CurrentTeacherInfoDto | null = null;
+    let studentInfo: CurrentStudentInfoDto | null = null;
+    let schoolName = '';
+
+    if (roleIds.includes(AdminRolesMap.teacher)) {
+      const teacher = await this.dataSource.getRepository(Teacher).findOne({
+        where: { user_id: id },
+      });
+      if (teacher) {
+        const school = teacher.school_id
+          ? await this.dataSource.getRepository(School).findOneBy({ id: teacher.school_id })
+          : null;
+        const teacherRest = { ...teacher } as CurrentTeacherInfoDto & { id?: string };
+        delete teacherRest.id;
+        teacherInfo = {
+          ...teacherRest,
+          school_name: school?.name || '',
+        };
+        schoolName = school?.name || schoolName;
+      }
+    }
+
+    if (roleIds.includes(AdminRolesMap.student)) {
+      const student = await this.dataSource.getRepository(Student).findOne({
+        where: { user_id: id },
+      });
+      if (student) {
+        const school = student.school_id
+          ? await this.dataSource.getRepository(School).findOneBy({ id: student.school_id })
+          : null;
+        const studentRest = { ...student } as CurrentStudentInfoDto & { id?: string };
+        delete studentRest.id;
+        studentInfo = {
+          ...studentRest,
+          school_name: school?.name || '',
+        };
+        schoolName = school?.name || schoolName;
+      }
+    }
+
+    const safeUser = { ...user } as CurrentUserInfoDto & {
+      password?: string;
+    };
+    delete safeUser.password;
+    return {
+      user: safeUser,
+      roles,
+      teacherInfo,
+      studentInfo,
+      school_name: schoolName,
+    };
+  }
+
+  async updateSelfBasic(
+    userId: string,
+    payload: { sex: boolean },
+  ): Promise<{ userId: string; sex: boolean }> {
+    const user = await this.usersRepository.findOneBy({ id: userId });
+    if (!user) {
+      throw new NotFoundException('用户不存在');
+    }
+
+    user.sex = payload.sex;
+    user.update_time = this.getNowUnixTimestamp();
+    await this.usersRepository.save(user);
+    return { userId, sex: user.sex };
+  }
+
+  async updateSelfPassword(
+    userId: string,
+    oldPassword: string,
+    newPassword: string,
+  ): Promise<{ updated: boolean }> {
+    const user = await this.usersRepository.findOneBy({ id: userId });
+    if (!user) {
+      throw new NotFoundException('用户不存在');
+    }
+
+    const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
+    if (!isOldPasswordValid) {
+      throw new BadRequestException('旧密码不正确');
+    }
+
+    user.password = await bcrypt.hash(
+      String(newPassword),
+      await bcrypt.genSalt(10),
+    );
+    user.update_time = this.getNowUnixTimestamp();
+    await this.usersRepository.save(user);
+    return { updated: true };
+  }
+
+  async updateSelfAvatar(
+    userId: string,
+    tempAvatarPath: string,
+  ): Promise<{ avatar: string }> {
+    const user = await this.usersRepository.findOneBy({ id: userId });
+    if (!user) {
+      throw new NotFoundException('用户不存在');
+    }
+
+    const normalizedPath = tempAvatarPath
+      .replace(/\\/g, '/')
+      .replace(/^\/+/, '');
+    if (
+      normalizedPath.includes('..') ||
+      !normalizedPath.startsWith(`${UserProfileMap.TEMP_AVATAR_PREFIX}/`)
+    ) {
+      throw new BadRequestException('头像临时路径非法');
+    }
+
+    const sourceAbsolutePath = path.join(getFileStoreRoot(), normalizedPath);
+    if (!fs.existsSync(sourceAbsolutePath)) {
+      throw new NotFoundException('临时头像文件不存在');
+    }
+
+    const avatarDir = FilePathTemplate.userAvatars();
+    fs.mkdirSync(avatarDir, { recursive: true });
+
+    const avatarRelativePath = `${UserProfileMap.USER_AVATAR_PREFIX}/${userId}.png`;
+    const avatarAbsolutePath = path.join(
+      getFileStoreRoot(),
+      avatarRelativePath,
+    );
+    if (fs.existsSync(avatarAbsolutePath)) {
+      fs.unlinkSync(avatarAbsolutePath);
+    }
+
+    this.moveFile(sourceAbsolutePath, avatarAbsolutePath);
+
+    user.avatar = avatarRelativePath;
+    user.update_time = this.getNowUnixTimestamp();
+    await this.usersRepository.save(user);
+    return { avatar: avatarRelativePath };
+  }
+
+  async updateSelfPhone(
+    userId: string,
+    newPhone: string,
+    code?: string,
+  ): Promise<{
+    sent?: boolean;
+    expireInSeconds?: number;
+    updated?: boolean;
+    phone?: string;
+  }> {
+    const user = await this.usersRepository.findOneBy({ id: userId });
+    if (!user) {
+      throw new NotFoundException('用户不存在');
+    }
+
+    const redisKey = this.getPhoneUpdateCodeKey(userId, newPhone);
+    if (!code) {
+      const verificationCode = this.generatePhoneVerificationCode();
+      await this.redis.set(
+        redisKey,
+        verificationCode,
+        'EX',
+        UserProfileMap.PHONE_CODE_TTL_SECONDS,
+      );
+      console.log(`[SMS-MOCK] phone=${newPhone}, code=${verificationCode}`);
+      return {
+        sent: true,
+        expireInSeconds: UserProfileMap.PHONE_CODE_TTL_SECONDS,
+      };
+    }
+
+    const cachedCode = await this.redis.get(redisKey);
+    if (!cachedCode) {
+      throw new BadRequestException('验证码不存在或已过期');
+    }
+    if (cachedCode !== code) {
+      throw new BadRequestException('验证码错误');
+    }
+
+    const duplicatePhoneUser = await this.usersRepository.findOne({
+      select: ['id'],
+      where: { phone: newPhone },
+    });
+    if (duplicatePhoneUser && duplicatePhoneUser.id !== userId) {
+      throw new ConflictException('手机号已被占用');
+    }
+
+    user.phone = newPhone;
+    user.update_time = this.getNowUnixTimestamp();
+    await this.usersRepository.save(user);
+    await this.redis.del(redisKey);
+
+    return {
+      updated: true,
+      phone: newPhone,
+    };
+  }
+
   async updateUserRoles(
     id: string,
     roleIds: string[],
@@ -202,6 +426,32 @@ export class UserService {
       throw new NotFoundException('用户不存在');
     }
     return { code: 200, message: '更新成功' };
+  }
+
+  private getNowUnixTimestamp(): string {
+    return String(Math.floor(Date.now() / 1000));
+  }
+
+  private generatePhoneVerificationCode(): string {
+    return String(Math.floor(100000 + Math.random() * 900000));
+  }
+
+  private getPhoneUpdateCodeKey(userId: string, newPhone: string): string {
+    return `${UserProfileMap.PHONE_CODE_PREFIX}:${userId}:${newPhone}`;
+  }
+
+  private moveFile(sourcePath: string, targetPath: string): void {
+    try {
+      fs.renameSync(sourcePath, targetPath);
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+      if (err.code !== 'EXDEV') {
+        throw new BadRequestException('头像文件移动失败');
+      }
+
+      fs.copyFileSync(sourcePath, targetPath);
+      fs.unlinkSync(sourcePath);
+    }
   }
 
   /**

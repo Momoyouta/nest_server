@@ -31,6 +31,10 @@ export class User {
   @ApiProperty({ description: '手机号', required: false })
   phone: string;
 
+  @Column()
+  @ApiProperty({ description: '头像url' })
+  avatar: string;
+
   @Column({ type: 'varchar', length: 20, nullable: true })
   @ApiProperty({ description: '创建时间戳 (s)', required: false })
   create_time: string;

@@ -7,8 +7,8 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "cross-env NODE_ENV=prod nest build",
-    "start:dev": "cross-env NODE_ENV=dev nest start --watch",
-    "start:prod": "cross-env NODE_ENV=prod nest start --watch",
+    "dev": "cross-env NODE_ENV=dev nest start --watch",
+    "prod": "cross-env NODE_ENV=prod nest start --watch",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start:debug": "nest start --debug --watch",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",

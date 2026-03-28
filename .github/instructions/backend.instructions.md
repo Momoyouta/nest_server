@@ -12,3 +12,4 @@ applyTo: '**'
 - Implementation plan必须用中文编写
 - TypeOrmModule实体的注册在src/modules/common/common/common.module.ts下，通过const entities = [User, Role];来注册实体，不需要在其他地方TypeOrmModule.forFeature()
 - 创建、更新操作必须添加create_time、update_time 时间戳(s)，string
+- 必须使用swagger文档，接口必须添加相关注解来描述接口功能、请求响应参数等信息
