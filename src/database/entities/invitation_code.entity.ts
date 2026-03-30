@@ -21,6 +21,9 @@ export class InvitationCode {
   @Column({ name: 'class_id', nullable: true })
   class_id: string;
 
+  @Column({ name: 'course_id', nullable: true, comment: '课程id' })
+  course_id: string;
+
   @Column({ name: 'creater_id' })
   creater_id: string;
 

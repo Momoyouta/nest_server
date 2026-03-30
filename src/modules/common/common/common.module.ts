@@ -12,6 +12,16 @@ import { School } from '@/database/entities/school.entity';
 import { InvitationCode } from '@/database/entities/invitation_code.entity';
 import { FileChunk } from '@/modules/file/chunk/chunk.entity';
 import { SchoolApplication } from '@/database/entities/school_application.entity';
+import { Course } from '@/database/entities/course.entity';
+import { CourseChapter } from '@/database/entities/course_chapter.entity';
+import { CourseLesson } from '@/database/entities/course_lesson.entity';
+import { CourseTeacher } from '@/database/entities/course_teacher.entity';
+import { CourseStudent } from '@/database/entities/course_student.entity';
+import { CourseLearningRecord } from '@/database/entities/course_learning_record.entity';
+import { CourseAssignment } from '@/database/entities/course_assignment.entity';
+import { CourseAssignmentQuestion } from '@/database/entities/course_assignment_question.entity';
+import { AssignmentSubmission } from '@/database/entities/assignment_submission.entity';
+import { AssignmentAnswerDetail } from '@/database/entities/assignment_answer_detail.entity';
 
 const entities = [
   User,
@@ -23,6 +33,16 @@ const entities = [
   InvitationCode,
   FileChunk,
   SchoolApplication,
+  Course,
+  CourseChapter,
+  CourseLesson,
+  CourseTeacher,
+  CourseStudent,
+  CourseLearningRecord,
+  CourseAssignment,
+  CourseAssignmentQuestion,
+  AssignmentSubmission,
+  AssignmentAnswerDetail,
 ];
 @Global()
 @Module({
