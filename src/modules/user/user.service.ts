@@ -338,8 +338,8 @@ export class UserService {
 
     const avatarDir = FilePathTemplate.userAvatars();
     fs.mkdirSync(avatarDir, { recursive: true });
-
-    const avatarRelativePath = `${UserProfileMap.USER_AVATAR_PREFIX}/${userId}.png`;
+    const stemp = new Date().getTime();
+    const avatarRelativePath = `${UserProfileMap.USER_AVATAR_PREFIX}/${userId}-${stemp}.png`;
     const avatarAbsolutePath = path.join(
       getFileStoreRoot(),
       avatarRelativePath,

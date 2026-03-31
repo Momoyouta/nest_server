@@ -17,6 +17,7 @@ import { SchoolAdminModule } from './modules/school_admin/school_admin.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { InvitationModule } from './modules/invitation/invitation.module';
 import { FileModule } from './modules/file/file.module';
+import { CourseModule } from './modules/course/course.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { getFileStoreRoot } from '@/common/utils/file-path.map';
 
@@ -52,6 +53,7 @@ const isDevEnv = (process.env.NODE_ENV || 'dev') === 'dev';
     RedisModule,
     InvitationModule,
     FileModule,
+    CourseModule,
     ...(isDevEnv
       ? [
           ServeStaticModule.forRoot({
