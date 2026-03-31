@@ -40,6 +40,7 @@ import { Role } from '@/database/entities/role.entity';
 import { User } from '@/database/entities/user.entity';
 import { BaseQueryDto } from '@/common/dto/base-query.dto';
 import { AdminAuth } from '@/common/decorators/admin-auth.decorator';
+import { AllJwtAuth } from '@/common/decorators/auth.decorator';
 
 @ApiTags('用户管理')
 @ApiBearerAuth()
@@ -130,7 +131,7 @@ export class UserController {
   @Put('profile/updateAvatar')
   @ApiOperation({
     summary:
-      '用户端修改头像（将 uploadImageTemp 临时图移动到 fileStore/users/avatars/{user_id}.png）',
+      '用户端修改头像（将 uploadImageTemp 临时图移动到 fileStore/users/avatars/{user_id}-{timestamp}.png）',
   })
   @ApiBody({ type: UpdateAvatarDto })
   @ApiResponse({
@@ -143,6 +144,29 @@ export class UserController {
     @Body() dto: UpdateAvatarDto,
   ): Promise<Result<UpdateAvatarResponseDto>> {
     const userId = this.getCurrentUserIdOrThrow();
+    const data = await this.userService.updateSelfAvatar(
+      userId,
+      dto.tempAvatarPath,
+    );
+    return Result.success('修改成功', data);
+  }
+
+  @Put('profile/updateAvatarAdmin')
+  @AdminAuth()
+  @ApiOperation({
+    summary: '管理端修改头像',
+  })
+  @ApiBody({ type: UpdateAvatarDto })
+  @ApiResponse({
+    status: 200,
+    description: '修改成功',
+    type: UpdateAvatarResponseDto,
+  })
+  @ApiResponse({ status: 400, description: '临时路径非法或文件移动失败' })
+  async updateAvatarAdmin(
+    @Body() dto: UpdateAvatarDto,
+    @Param('userId') userId: string,
+  ): Promise<Result<UpdateAvatarResponseDto>> {
     const data = await this.userService.updateSelfAvatar(
       userId,
       dto.tempAvatarPath,

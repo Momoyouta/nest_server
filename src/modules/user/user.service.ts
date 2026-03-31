@@ -58,6 +58,8 @@ export class UserService {
       'user.create_time',
       'user.update_time',
       'user.status',
+      'user.avatar',
+      'user.phone',
     ]);
 
     if (id) {
@@ -338,12 +340,15 @@ export class UserService {
 
     const avatarDir = FilePathTemplate.userAvatars();
     fs.mkdirSync(avatarDir, { recursive: true });
-    const stemp = new Date().getTime();
-    const avatarRelativePath = `${UserProfileMap.USER_AVATAR_PREFIX}/${userId}-${stemp}.png`;
+    const timestamp = new Date().getTime();
+    const avatarRelativePath = `${UserProfileMap.USER_AVATAR_PREFIX}/${userId}-${timestamp}.png`;
     const avatarAbsolutePath = path.join(
       getFileStoreRoot(),
       avatarRelativePath,
     );
+
+    this.removeOldAvatarIfExists(user.avatar);
+
     if (fs.existsSync(avatarAbsolutePath)) {
       fs.unlinkSync(avatarAbsolutePath);
     }
@@ -451,6 +456,33 @@ export class UserService {
 
       fs.copyFileSync(sourcePath, targetPath);
       fs.unlinkSync(sourcePath);
+    }
+  }
+
+  private removeOldAvatarIfExists(currentAvatarPath?: string): void {
+    if (!currentAvatarPath) {
+      return;
+    }
+
+    const normalizedPath = currentAvatarPath
+      .replace(/\\/g, '/')
+      .replace(/^\/+/, '');
+
+    if (
+      normalizedPath.includes('..') ||
+      !normalizedPath.startsWith(`${UserProfileMap.USER_AVATAR_PREFIX}/`)
+    ) {
+      return;
+    }
+
+    const oldAvatarAbsolutePath = path.join(getFileStoreRoot(), normalizedPath);
+    try {
+      fs.unlinkSync(oldAvatarAbsolutePath);
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+      if (err.code !== 'ENOENT') {
+        throw new BadRequestException('旧头像删除失败');
+      }
     }
   }
 
