@@ -21,6 +21,7 @@ import { Teacher } from '@/database/entities/teacher.entity';
 import { User } from '@/database/entities/user.entity';
 import { DataSource, In, Repository } from 'typeorm';
 import {
+  CourseBasicResponseDto,
   CourseListItemDto,
   CourseListQueryDto,
   CreateCourseDto,
@@ -33,22 +34,13 @@ import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorag
 interface CourseListRowRaw {
   id: string;
   school_id: string;
+  school_name: string | null;
   creator_id: string;
   name: string;
   cover_img: string | null;
   status: number | string;
   create_time: string | null;
   update_time: string | null;
-}
-
-interface ChapterCountRowRaw {
-  course_id: string;
-  chapter_count: number | string;
-}
-
-interface LessonCountRowRaw {
-  course_id: string;
-  total_lesson_count: number | string;
 }
 
 interface TeacherNameRowRaw {
@@ -124,13 +116,12 @@ export class CourseService {
     if (payload.cover_img !== undefined) {
       course.cover_img = payload.cover_img;
     }
-    if (payload.description !== undefined) {
-      course.description = payload.description;
-    }
     if (payload.status !== undefined) {
       course.status = payload.status;
     }
-
+    if (payload.description !== undefined) {
+      course.description = payload.description;
+    }
     await this.courseRepository.save(course);
     return { id: course.id, updated: true };
   }
@@ -250,9 +241,11 @@ export class CourseService {
     const total = await baseQb.getCount();
     const courseRows = await baseQb
       .clone()
+      .leftJoin(School, 'school', 'school.id = course.school_id')
       .select([
         'course.id AS id',
         'course.school_id AS school_id',
+        'school.name AS school_name',
         'course.creator_id AS creator_id',
         'course.name AS name',
         'course.cover_img AS cover_img',
@@ -270,23 +263,6 @@ export class CourseService {
     }
 
     const courseIds = courseRows.map((item) => item.id);
-
-    const chapterCountRows = await this.courseChapterRepository
-      .createQueryBuilder('chapter')
-      .select('chapter.course_id', 'course_id')
-      .addSelect('COUNT(chapter.id)', 'chapter_count')
-      .where('chapter.course_id IN (:...courseIds)', { courseIds })
-      .groupBy('chapter.course_id')
-      .getRawMany<ChapterCountRowRaw>();
-
-    const lessonCountRows = await this.courseChapterRepository
-      .createQueryBuilder('chapter')
-      .leftJoin(CourseLesson, 'lesson', 'lesson.chapter_id = chapter.id')
-      .select('chapter.course_id', 'course_id')
-      .addSelect('COUNT(lesson.id)', 'total_lesson_count')
-      .where('chapter.course_id IN (:...courseIds)', { courseIds })
-      .groupBy('chapter.course_id')
-      .getRawMany<LessonCountRowRaw>();
 
     const teacherRows = await this.courseTeacherRepository
       .createQueryBuilder('ct')
@@ -307,22 +283,6 @@ export class CourseService {
             where: { id: In(creatorIds) },
           })
         : [];
-
-    const chapterCountMap = new Map<string, number>();
-    chapterCountRows.forEach((item) => {
-      chapterCountMap.set(
-        String(item.course_id),
-        Number(item.chapter_count) || 0,
-      );
-    });
-
-    const lessonCountMap = new Map<string, number>();
-    lessonCountRows.forEach((item) => {
-      lessonCountMap.set(
-        String(item.course_id),
-        Number(item.total_lesson_count) || 0,
-      );
-    });
 
     const teacherNamesMap = new Map<string, Set<string>>();
     teacherRows.forEach((item) => {
@@ -348,13 +308,12 @@ export class CourseService {
         id: rowCourseId,
         school_id: String(row.school_id),
         creator_id: String(row.creator_id),
+        school_name: row.school_name ? String(row.school_name) : '',
         name: String(row.name),
         cover_img: row.cover_img ? String(row.cover_img) : undefined,
         status: Number(row.status),
         create_time: row.create_time ? String(row.create_time) : undefined,
         update_time: row.update_time ? String(row.update_time) : undefined,
-        chapter_count: chapterCountMap.get(rowCourseId) || 0,
-        total_lesson_count: lessonCountMap.get(rowCourseId) || 0,
         teacher_names: Array.from(teacherNamesMap.get(rowCourseId) || []),
         creator_name: creatorNameMap.get(String(row.creator_id)),
       };
@@ -362,6 +321,63 @@ export class CourseService {
 
     return { list, total };
   }
+
+  async getCourseBasicAdmin(id: string): Promise<CourseBasicResponseDto> {
+    const user = await this.getCurrentUserOrThrow();
+    const course = await this.findCourseWithPermissionOrThrow(id, user);
+
+    const school = await this.schoolRepository.findOne({
+      select: ['name'],
+      where: { id: course.school_id },
+    });
+
+    const creator = await this.userRepository.findOne({
+      select: ['name'],
+      where: { id: course.creator_id },
+    });
+
+    const teacherRows = await this.courseTeacherRepository
+      .createQueryBuilder('ct')
+      .innerJoin(Teacher, 'teacher', 'teacher.id = ct.teacher_id')
+      .innerJoin(User, 'user', 'user.id = teacher.user_id')
+      .select('user.name', 'teacher_name')
+      .where('ct.course_id = :courseId', { courseId: course.id })
+      .getRawMany<{ teacher_name: string | null }>();
+
+    const teacher_names = Array.from(
+      new Set(
+        teacherRows
+          .map((item) => String(item.teacher_name || '').trim())
+          .filter((item) => item.length > 0),
+      ),
+    );
+
+    return {
+      id: course.id,
+      school_id: course.school_id,
+      school_name: school?.name || '',
+      creator_id: course.creator_id,
+      creator_name: creator?.name,
+      name: course.name,
+      cover_img: course.cover_img,
+      status: Number(course.status),
+      create_time: course.create_time,
+      update_time: course.update_time,
+      teacher_names,
+    };
+  }
+
+  async getCourseDescription(id: string): Promise<{ description: string }> {
+    const course = await this.courseRepository.findOne({
+      select: ['description'],
+      where: { id },
+    });
+    if (!course) {
+      throw new NotFoundException('课程不存在');
+    }
+    return { description: course.description || '' };
+  }
+
 
   private async getCurrentUserOrThrow(): Promise<User> {
     const userId = this.alsService.getUserId();

@@ -17,12 +17,20 @@ export class CourseLesson {
   title: string;
 
   @Column({ type: 'varchar', length: 500, nullable: true })
-  @ApiProperty({ description: '视频地址', required: false })
-  video_url?: string;
+  @ApiProperty({ description: '视频资源id', required: false })
+  resource_id?: string;
 
   @Column({ type: 'int', default: 0 })
   @ApiProperty({ description: '排序值', default: 0 })
   sort_order: number;
+
+  @Column({ type: 'int', default: 0 })
+  @ApiProperty({ description: '时长', default: 0 })
+  duration: number;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ description: '课时描述', required: false })
+  description?: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   @ApiProperty({ description: '创建时间戳(s)', required: false })

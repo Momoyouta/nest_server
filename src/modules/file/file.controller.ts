@@ -34,7 +34,7 @@ import { FilePathMap, FilePathTemplate } from '@/common/utils/file-path.map';
 import { Public } from '@/common/decorators/auth.decorator';
 
 
-@ApiTags('文件管理')
+@ApiTags('文件上传与资源中心')
 @Controller('file')
 export class FileController {
   constructor(
@@ -46,19 +46,23 @@ export class FileController {
 
   // ===== 小文件上传 =====
   @Post('upload/image')
-  @ApiOperation({ summary: '上传图片（<5MB）' })
+  @ApiOperation({ summary: '上传图片（<5MB）', description: '基于业务场景将单张图片直接写入目标存储库' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
+    description: '单文件上传负载',
     schema: {
       type: 'object',
-      required: ['file', 'target'],
+      required: ['file', 'scenario'],
       properties: {
         file: { type: 'string', format: 'binary', description: '图片文件' },
-        target: { type: 'string', description: '目标目录相对路径', example: 'schools/1/avatars' },
+        scenario: { type: 'string', description: '上传场景 (avatar, school_resource, course_homework)' },
+        schoolId: { type: 'number', description: '学校ID（按需）' },
+        courseId: { type: 'number', description: '课程ID（按需）' },
+        homeworkId: { type: 'number', description: '作业ID（按需）' },
       },
     },
   })
-  @ApiResponse({ status: 200, description: '上传成功，返回存储相对路径' })
+  @ApiResponse({ status: 200, description: '上传成功，返回存储跨系统路径' })
   @ApiResponse({ status: 413, description: '文件大小超过 5MB 限制' })
   @ApiResponse({ status: 415, description: '不支持的文件类型' })
   @UseInterceptors(FileInterceptor('file'))
@@ -66,7 +70,8 @@ export class FileController {
     @UploadedFile() file: Express.Multer.File,
     @Body() dto: UploadImageDto,
   ) {
-    const result = this.uploadService.saveImage(file, dto.target);
+    const targetDir = this.uploadService.resolveBusinessStoragePath(dto);
+    const result = this.uploadService.saveImage(file, targetDir);
     return { code: 200, msg: '上传成功', data: result };
   }
 
@@ -105,20 +110,27 @@ export class FileController {
   }
 
   @Post('chunk/upload')
-  @ApiOperation({ summary: '上传单个分片' })
+  @ApiOperation({ summary: '上传单个分片', description: '上传文件分片，需携带业务上下文(scenario等参数)隔离存储到租户路径。' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
+    description: '分片上传负载，包含文件及业务上下文 DTO 参数',
     schema: {
       type: 'object',
-      required: ['file', 'uploadId', 'chunkIndex'],
+      required: ['file', 'uploadId', 'chunkIndex', 'fileHash', 'scenario'],
       properties: {
         file: { type: 'string', format: 'binary', description: '分片文件' },
         uploadId: { type: 'string', description: '上传任务ID' },
         chunkIndex: { type: 'number', description: '分片索引（从0开始）' },
+        fileHash: { type: 'string', description: '文件SHA-256哈希值' },
+        scenario: { type: 'string', description: '上传场景 (avatar, school_resource, course_homework)' },
+        schoolId: { type: 'number', description: '学校ID（按需）' },
+        courseId: { type: 'number', description: '课程ID（按需）' },
+        homeworkId: { type: 'number', description: '作业ID（按需）' },
       },
     },
   })
   @ApiResponse({ status: 200, description: '分片上传成功' })
+  @ApiResponse({ status: 400, description: '参数校验失败' })
   @ApiResponse({ status: 404, description: '上传任务不存在' })
   @UseInterceptors(FileInterceptor('file'))
   async uploadChunk(
@@ -140,9 +152,9 @@ export class FileController {
   }
 
   @Post('chunk/merge')
-  @ApiOperation({ summary: '合并所有分片，生成最终文件' })
-  @ApiResponse({ status: 200, description: '合并成功，返回最终文件路径' })
-  @ApiResponse({ status: 400, description: '分片未全部上传' })
+  @ApiOperation({ summary: '合并所有分片，生成最终文件并迁移至业务目录' })
+  @ApiResponse({ status: 200, description: '合并成功，返回最终文件跨系统可访问路径' })
+  @ApiResponse({ status: 400, description: '分片未全部上传或参数校验失败' })
   @ApiResponse({ status: 404, description: '上传任务不存在' })
   async mergeChunks(@Body() dto: MergeChunkDto) {
     const data = await this.chunkService.mergeChunks(dto);

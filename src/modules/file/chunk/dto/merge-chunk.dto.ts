@@ -1,5 +1,7 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { FileUploadScenario } from '@/common/utils/file-scenario.map';
 
 export class MergeChunkDto {
   @ApiProperty({ description: '上传任务ID', example: 'uuid-v4-string' })
@@ -12,11 +14,35 @@ export class MergeChunkDto {
   @IsNotEmpty()
   fileHash: string;
 
-  @ApiProperty({
-    description: '目标存储相对路径',
-    example: 'schools/1/courses/2/chapters/3/lessons/4',
-  })
+  @ApiProperty({ description: '原始文件名', example: 'lecture01.mp4' })
   @IsString()
   @IsNotEmpty()
-  targetPath: string;
+  fileName: string;
+
+  @ApiProperty({
+    description: '上传业务场景',
+    enum: FileUploadScenario,
+    example: FileUploadScenario.AVATAR
+  })
+  @IsEnum(FileUploadScenario)
+  @IsNotEmpty()
+  scenario: string;
+
+  @ApiPropertyOptional({ description: '学校ID（校本资源/课程作业场景必填）', example: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  schoolId?: number;
+
+  @ApiPropertyOptional({ description: '课程ID（课程作业场景必填）', example: 101 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  courseId?: number;
+
+  @ApiPropertyOptional({ description: '作业ID（部分具体作业相关上传需要）', example: 202 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  homeworkId?: number;
 }

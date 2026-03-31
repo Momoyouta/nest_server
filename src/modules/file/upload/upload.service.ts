@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { getFileStoreRoot } from '@/common/utils/file-path.map';
+import { FileUploadScenario } from '@/common/utils/file-scenario.map';
 
 const ALLOWED_MIME_TYPES = [
   'image/jpeg',
@@ -19,6 +20,39 @@ const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
 @Injectable()
 export class UploadService {
+  /**
+   * 根据业务场景和参数，解析出对应的相对存储目录
+   */
+  resolveBusinessStoragePath(dto: {
+    scenario: string;
+    schoolId?: number;
+    courseId?: number;
+    homeworkId?: number;
+  }): string {
+    switch (dto.scenario) {
+      case FileUploadScenario.AVATAR:
+        return 'users/avatars';
+
+      case FileUploadScenario.SCHOOL_RESOURCE:
+        if (!dto.schoolId) {
+          throw new BadRequestException('上传校本资源必须提供 schoolId');
+        }
+        return `schools/${dto.schoolId}/resource_library`;
+
+      case FileUploadScenario.COURSE_HOMEWORK:
+        if (!dto.schoolId || !dto.courseId) {
+          throw new BadRequestException('上传课程作业必须提供 schoolId 和 courseId');
+        }
+        if (dto.homeworkId) {
+          return `schools/${dto.schoolId}/courses/${dto.courseId}/homework/${dto.homeworkId}`;
+        }
+        return `schools/${dto.schoolId}/courses/${dto.courseId}/homework`;
+
+      default:
+        throw new BadRequestException('未知的上传场景');
+    }
+  }
+
   /**
    * 保存图片到磁盘
    * @param file multer 上传的文件对象

@@ -13,12 +13,14 @@ import { InitChunkDto } from './dto/init-chunk.dto';
 import { UploadChunkDto } from './dto/upload-chunk.dto';
 import { MergeChunkDto } from './dto/merge-chunk.dto';
 import { FilePathTemplate, getFileStoreRoot } from '@/common/utils/file-path.map';
+import { UploadService } from '../upload/upload.service';
 
 @Injectable()
 export class ChunkService {
   constructor(
     @InjectRepository(FileChunk)
     private readonly chunkRepo: Repository<FileChunk>,
+    private readonly uploadService: UploadService,
   ) {}
 
   /**
@@ -133,7 +135,8 @@ export class ChunkService {
    * 合并分片
    */
   async mergeChunks(dto: MergeChunkDto) {
-    const { uploadId, fileHash, targetPath } = dto;
+    const { uploadId, fileHash } = dto;
+    const targetPath = this.uploadService.resolveBusinessStoragePath(dto);
 
     const record = await this.chunkRepo.findOne({ where: { id: uploadId } });
     if (!record) {
