@@ -143,6 +143,9 @@ export const FilePathTemplate = {
   /** 临时图片目录 */
   tempImages: () => resolvePath('uploads', 'temp', 'images'),
 
+  /** 临时视频目录 */
+  tempVideos: () => resolvePath('uploads', 'temp', 'videos'),
+
   /** 分片上传临时目录 */
   chunkTemp: (fileHash: string) =>
     resolvePath('uploads', 'temp', 'chunks', fileHash),
@@ -154,5 +157,5 @@ export const FilePathTemplate = {
 
 export const FilePathMap = {
   TEMP_IMG: 'uploads/temp/images',
-
-}
+  TEMP_VIDEO: 'uploads/temp/videos',
+};

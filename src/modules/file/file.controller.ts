@@ -32,6 +32,7 @@ import { CreateChapterLessonDirDto } from './storage/dto/create-chapter-lesson-d
 import { CreateHomeworkDirDto } from './storage/dto/create-homework-dir.dto';
 import { FilePathMap, FilePathTemplate } from '@/common/utils/file-path.map';
 import { Public } from '@/common/decorators/auth.decorator';
+import { AdminAuth } from '@/common/decorators/admin-auth.decorator';
 
 
 @ApiTags('文件上传与资源中心')
@@ -102,6 +103,7 @@ export class FileController {
   // ===== 分片上传 =====
 
   @Post('chunk/init')
+  @AdminAuth()
   @ApiOperation({ summary: '初始化分片上传（支持断点续传）' })
   @ApiResponse({ status: 200, description: '初始化成功，返回uploadId和已上传分片列表' })
   async initChunkUpload(@Body() dto: InitChunkDto) {
@@ -110,6 +112,7 @@ export class FileController {
   }
 
   @Post('chunk/upload')
+  @AdminAuth()
   @ApiOperation({ summary: '上传单个分片', description: '上传文件分片，需携带业务上下文(scenario等参数)隔离存储到租户路径。' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -121,7 +124,7 @@ export class FileController {
         file: { type: 'string', format: 'binary', description: '分片文件' },
         uploadId: { type: 'string', description: '上传任务ID' },
         chunkIndex: { type: 'number', description: '分片索引（从0开始）' },
-        fileHash: { type: 'string', description: '文件SHA-256哈希值' },
+        fileHash: { type: 'string', description: '文件MD5哈希值' },
         scenario: { type: 'string', description: '上传场景 (avatar, school_resource, course_homework)' },
         schoolId: { type: 'number', description: '学校ID（按需）' },
         courseId: { type: 'number', description: '课程ID（按需）' },
@@ -142,8 +145,9 @@ export class FileController {
   }
 
   @Get('chunk/progress/:fileHash')
+  @AdminAuth()
   @ApiOperation({ summary: '查询分片上传进度' })
-  @ApiParam({ name: 'fileHash', description: '文件SHA-256哈希值' })
+  @ApiParam({ name: 'fileHash', description: '文件MD5哈希值' })
   @ApiResponse({ status: 200, description: '返回已上传分片列表和任务状态' })
   @ApiResponse({ status: 404, description: '未找到上传任务' })
   async getChunkProgress(@Param('fileHash') fileHash: string) {
@@ -152,6 +156,7 @@ export class FileController {
   }
 
   @Post('chunk/merge')
+  @AdminAuth()
   @ApiOperation({ summary: '合并所有分片，生成最终文件并迁移至业务目录' })
   @ApiResponse({ status: 200, description: '合并成功，返回最终文件跨系统可访问路径' })
   @ApiResponse({ status: 400, description: '分片未全部上传或参数校验失败' })
@@ -162,6 +167,7 @@ export class FileController {
   }
 
   @Post('chunk/cleanup')
+  @AdminAuth()
   @Role('admin', 'root')
   @ApiOperation({ summary: '手动触发过期分片清理（管理端）' })
   @ApiResponse({ status: 200, description: '清理完成，返回清理数量和耗时' })

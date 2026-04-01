@@ -9,7 +9,7 @@ export class MergeChunkDto {
   @IsNotEmpty()
   uploadId: string;
 
-  @ApiProperty({ description: '文件SHA-256哈希值', example: 'abc123def456...' })
+  @ApiProperty({ description: '文件MD5哈希值', example: 'abc123def456...' })
   @IsString()
   @IsNotEmpty()
   fileHash: string;

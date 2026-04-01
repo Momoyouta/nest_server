@@ -15,7 +15,7 @@ export class UploadChunkDto {
   @Min(0)
   chunkIndex: number;
 
-  @ApiProperty({ description: '文件SHA-256哈希值', example: 'abcd1234efgh5678' })
+  @ApiProperty({ description: '文件MD5哈希值', example: 'abcd1234efgh5678' })
   @IsString()
   @IsNotEmpty()
   fileHash: string;
@@ -25,6 +25,7 @@ export class UploadChunkDto {
     enum: FileUploadScenario,
     example: FileUploadScenario.AVATAR
   })
+  @IsEnum(FileUploadScenario)
   @IsNotEmpty()
   scenario: string;
 

@@ -47,6 +47,13 @@ export class UploadService {
           return `schools/${dto.schoolId}/courses/${dto.courseId}/homework/${dto.homeworkId}`;
         }
         return `schools/${dto.schoolId}/courses/${dto.courseId}/homework`;
+      case FileUploadScenario.COURSE_RESOURCE:
+        if (!dto.schoolId || !dto.courseId) {
+          throw new BadRequestException('上传课程资源必须提供 schoolId 和 courseId');
+        }
+        return `schools/${dto.schoolId}/courses/${dto.courseId}/documents`;
+      case FileUploadScenario.TEMP_VIDEO:
+        return 'uploads/temp/videos';
 
       default:
         throw new BadRequestException('未知的上传场景');

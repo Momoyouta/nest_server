@@ -75,6 +75,8 @@ src/
 │       └── {user_id}.png
 └── uploads\                         # 上传缓冲区 (维持不变，处理前端单次上传)
     └── temp\
+	    ├── videos 
+	    |   └── {file_hash.mp4}  
 	    ├── images   
 	    |   └── {file_hash.png}                         
         └── chunks\                  

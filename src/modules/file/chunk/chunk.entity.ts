@@ -9,7 +9,7 @@ export class FileChunk {
   @PrimaryColumn({ type: 'varchar', length: 255 })
   id: string;
 
-  @ApiProperty({ description: '文件SHA-256 hash', example: 'abc123...' })
+  @ApiProperty({ description: '文件MD5 hash', example: 'abc123...' })
   @Column({ name: 'file_hash', type: 'varchar', length: 255, unique: true })
   fileHash: string;
 
