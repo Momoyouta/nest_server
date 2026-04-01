@@ -27,13 +27,25 @@ export const FilePathTemplate = {
   schoolAvatars: (schoolId: number | string) =>
     resolvePath('schools', String(schoolId), 'avatars'),
 
-  /** 学校通用教学资料 */
-  schoolMaterials: (schoolId: number | string) =>
-    resolvePath('schools', String(schoolId), 'materials'),
+  /** 学校资源库根目录 */
+  schoolResourceLibrary: (schoolId: number | string) =>
+    resolvePath('schools', String(schoolId), 'resource_library'),
 
-  /** 学校公共资源库 */
-  schoolPublicMaterials: (schoolId: number | string) =>
-    resolvePath('schools', String(schoolId), 'publicMaterials'),
+  /** 学校资源库子目录：视频 */
+  schoolResourceVideos: (schoolId: number | string) =>
+    resolvePath('schools', String(schoolId), 'resource_library', 'videos'),
+
+  /** 学校资源库子目录：文档 */
+  schoolResourceDocs: (schoolId: number | string) =>
+    resolvePath('schools', String(schoolId), 'resource_library', 'documents'),
+
+  /** 学校资源库子目录：图片 */
+  schoolResourceImages: (schoolId: number | string) =>
+    resolvePath('schools', String(schoolId), 'resource_library', 'images'),
+
+  /** 学校私有目录 (证明等) */
+  schoolPrivate: (schoolId: number | string) =>
+    resolvePath('schools', String(schoolId), 'private'),
 
   /** 课程根目录 */
   courseRoot: (schoolId: number | string, courseId: number | string) =>

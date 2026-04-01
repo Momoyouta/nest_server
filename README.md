@@ -46,6 +46,39 @@ src/
 └── app.module.ts        # 根模块
 ```
 
+## 静态文件存储fileStore结构
+```
+ROOt:\fileStore
+├── server.log                       
+├── schools\                         # 学校业务根目录
+│   └── {school_id}\                 # 租户隔离：特定学校 ID
+│       ├── avatars\                 # 学校特有标识/默认头像
+│       ├── resource_library\        # 🚀 核心变更：统一的校本资源库
+│       │   ├── videos\              # 所有教学视频统统放在这里（管理员离线导入 / 教师单文件上传）
+│       │   │   ├── {file_hash}.mp4  
+│       │   │   └── bulk_import_temp\# 管理员批量上传的临时中转区
+│       │   ├── documents\           # 所有课件 (PDF/PPT/Word)
+│       │   │   └── {file_hash}.pdf
+│       │   └── images\              # 课程封面、插图等
+|       ├── private\                 # 私有文件（证明等
+│       └── courses\                 # 课程数据 (剥离了公共资源，只留强业务产生的动态数据)
+│           └── {course_id}\         
+│               └── homework\        # 🚀 学生作业提交（不可共享，强绑定课程）
+│                   └── {homework_id}\
+│                       └── {submit_id}\
+│                           └── answer.png
+├── users\                           # 用户全局数据
+│   └── avatars\                     # 全平台用户个人头像
+│       └── {user_id}.png
+└── uploads\                         # 上传缓冲区 (维持不变，处理前端单次上传)
+    └── temp\
+	    ├── images   
+	    |   └── {file_hash.png}                         
+        └── chunks\                  
+            └── {file_hash}\         
+                └── metadata.json
+```
+
 ## 快速开始
 
 ### 1. 安装依赖

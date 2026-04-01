@@ -24,6 +24,7 @@ import { SchoolAdmin } from '@/database/entities/school_admin.entity';
 import { AdminRolesMap } from '@/common/utils/role.map';
 import * as bcrypt from 'bcrypt';
 import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
+import { StorageService } from '@/modules/file/storage/storage.service';
 
 @Injectable()
 export class SchoolService {
@@ -40,6 +41,7 @@ export class SchoolService {
     private schoolAdminRepository: Repository<SchoolAdmin>,
     private readonly dataSource: DataSource,
     private readonly alsService: AsyncLocalstorageService,
+    private readonly storageService: StorageService,
   ) {}
 
   async applySchool(applySchoolDto: ApplySchoolDto): Promise<SchoolApplication> {
@@ -115,6 +117,26 @@ export class SchoolService {
           status: SchoolStatusMap.ENABLED,
         });
         const savedSchool = await schoolRepo.save(school);
+
+        // 1. 根据 storage 模块创建 {school_id} 的文件夹及其子文件夹
+        const schoolId = (savedSchool as any).id;
+        this.storageService.createSchoolDir({ schoolId });
+
+        // 2. 把证明图片迁移至 fileStore/schools/{school_id}/private/evidence_img.png
+        if (application.evidence_img_url) {
+          // 假设 evidence_img_url 为相对路径，如 /uploads/temp/images/xxx.png
+          const destRelative = `/schools/${schoolId}/private/evidence_img.png`;
+          try {
+            this.storageService.moveFile(application.evidence_img_url, destRelative);
+            // 3. 修正 evidence_img_url 的值为新相对地址
+            savedSchool.evidence_img_url = destRelative;
+            await schoolRepo.save(savedSchool);
+            application.evidence_img_url = destRelative;
+          } catch (error) {
+            this.logger.error(`Failed to move evidence image: ${error.message}`);
+            // 迁移失败不中断整个审批流程，但记录日志
+          }
+        }
 
         const account = await this.generateUniqueAccount(
           application.charge_phone,
