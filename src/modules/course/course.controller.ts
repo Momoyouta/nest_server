@@ -28,6 +28,7 @@ import {
   CreateCourseResponseDto,
   DeleteCourseResponseDto,
   UpdateCourseDto,
+  UpdateCourseCoverDto,
   UpdateCourseResponseDto,
 } from '@/modules/course/dto/CourseAdmin.dto';
 import { CourseService } from '@/modules/course/course.service';
@@ -67,6 +68,21 @@ export class CourseController {
   })
   async updateCourseAdmin(@Body() payload: UpdateCourseDto) {
     const data = await this.courseService.updateCourseAdmin(payload);
+    return Result.success('更新成功', data);
+  }
+
+  @Put('updateCourseCoverAdmin')
+  @AdminAuth()
+  @Role(...AdminRoles)
+  @ApiOperation({ summary: '单独更新课程封面' })
+  @ApiBody({ type: UpdateCourseCoverDto })
+  @ApiResponse({
+    status: 200,
+    description: '更新成功',
+    type: UpdateCourseResponseDto,
+  })
+  async updateCourseCoverAdmin(@Body() payload: UpdateCourseCoverDto) {
+    const data = await this.courseService.updateCourseCoverAdmin(payload);
     return Result.success('更新成功', data);
   }
 

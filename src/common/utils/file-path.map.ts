@@ -52,13 +52,34 @@ export const FilePathTemplate = {
     resolvePath('schools', String(schoolId), 'courses', String(courseId)),
 
   /** 课程专属资料 */
-  courseMaterials: (schoolId: number | string, courseId: number | string) =>
+  courseDocuments: (schoolId: number | string, courseId: number | string) =>
     resolvePath(
       'schools',
       String(schoolId),
       'courses',
       String(courseId),
-      'materials',
+      'documents',
+    ),
+
+  /** 课程图片资源 */
+  courseImages: (schoolId: number | string, courseId: number | string) =>
+    resolvePath(
+      'schools',
+      String(schoolId),
+      'courses',
+      String(courseId),
+      'images',
+    ),
+
+  /** 课程封面图文件 (banner.png) */
+  courseBanner: (schoolId: number | string, courseId: number | string) =>
+    resolvePath(
+      'schools',
+      String(schoolId),
+      'courses',
+      String(courseId),
+      'images',
+      'banner.png',
     ),
 
   /** 课程章节根目录 */

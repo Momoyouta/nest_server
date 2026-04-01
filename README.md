@@ -48,7 +48,7 @@ src/
 
 ## 静态文件存储fileStore结构
 ```
-ROOt:\fileStore
+\fileStore
 ├── server.log                       
 ├── schools\                         # 学校业务根目录
 │   └── {school_id}\                 # 租户隔离：特定学校 ID
@@ -57,12 +57,15 @@ ROOt:\fileStore
 │       │   ├── videos\              # 所有教学视频统统放在这里（管理员离线导入 / 教师单文件上传）
 │       │   │   ├── {file_hash}.mp4  
 │       │   │   └── bulk_import_temp\# 管理员批量上传的临时中转区
-│       │   ├── documents\           # 所有课件 (PDF/PPT/Word)
-│       │   │   └── {file_hash}.pdf
-│       │   └── images\              # 课程封面、插图等
+│       │   ├── documents\           # 公共资料
+│       │   │   └── {file_hash}.*
+│       │   └── images\              # 图片资源
 |       ├── private\                 # 私有文件（证明等
-│       └── courses\                 # 课程数据 (剥离了公共资源，只留强业务产生的动态数据)
-│           └── {course_id}\         
+│       └── courses\                 # 课程数据
+│           └── {course_id}\
+|               ├── documents\       # 课程资料
+|               ├── images\         # 图片资源
+|               |   └── banner.png     
 │               └── homework\        # 🚀 学生作业提交（不可共享，强绑定课程）
 │                   └── {homework_id}\
 │                       └── {submit_id}\

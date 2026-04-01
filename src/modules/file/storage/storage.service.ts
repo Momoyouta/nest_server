@@ -32,7 +32,7 @@ export class StorageService {
   /**
    * 移动文件
    * @param srcRelative 源相对路径 (如: uploads/temp/images/xxx.png)
-   * @param destRelative 目标相对路径 (如: schools/1/private/evidence_img.png)
+   * @param destRelative 目标相对路径 (如: schools/1/courses/1/images/banner.png)
    */
   moveFile(srcRelative: string, destRelative: string): void {
     // 处理路径开头，确保没有多余的斜杠，且能被 resolvePath 正确识别
@@ -43,21 +43,36 @@ export class StorageService {
     const destAbs = resolvePath(...cleanDest);
 
     if (fs.existsSync(srcAbs)) {
-      // 确保目标目录存在
-      const destDir = fs.realpathSync(destAbs.substring(0, destAbs.lastIndexOf(path.sep)));
-      // 实际上 mkdirSync({recursive: true}) 在 createSchoolDir 时已经做了
+      // 确保目标父目录存在
+      const destDir = path.dirname(destAbs);
+      if (!fs.existsSync(destDir)) {
+        fs.mkdirSync(destDir, { recursive: true });
+      }
       fs.renameSync(srcAbs, destAbs);
     }
   }
 
   /**
+   * 删除文件
+   * @param relativePath 相对路径 (如: schools/1/courses/1/images/banner.png)
+   */
+  deleteFile(relativePath: string): void {
+    const cleanPath = relativePath.replace(/^\/+/, '').split('/');
+    const absPath = resolvePath(...cleanPath);
+    if (fs.existsSync(absPath)) {
+      fs.unlinkSync(absPath);
+    }
+  }
+
+  /**
    * 创建课程目录结构
-   * 包含：materials、chapters、homework
+   * 包含：documents、images、chapters、homework
    */
   createCourseDir(dto: CreateCourseDirDto): string {
     const { schoolId, courseId } = dto;
     const dirs = [
-      FilePathTemplate.courseMaterials(schoolId, courseId),
+      FilePathTemplate.courseDocuments(schoolId, courseId),
+      FilePathTemplate.courseImages(schoolId, courseId),
       FilePathTemplate.courseChapters(schoolId, courseId),
       FilePathTemplate.homeworkRoot(schoolId, courseId),
     ];

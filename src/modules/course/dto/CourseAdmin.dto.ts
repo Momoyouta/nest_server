@@ -90,6 +90,21 @@ export class UpdateCourseDto {
   description?: string;
 }
 
+export class UpdateCourseCoverDto {
+  @ApiProperty({ description: '课程ID' })
+  @IsString()
+  @IsNotEmpty()
+  id: string;
+
+  @ApiPropertyOptional({
+    description: '临时文件相对路径，为空则删除原封面',
+    example: 'uploads/temp/images/xxx.png',
+  })
+  @IsOptional()
+  @IsString()
+  temp_path?: string;
+}
+
 export class CourseDeleteParamDto {
   @ApiProperty({ description: '课程ID' })
   @IsString()

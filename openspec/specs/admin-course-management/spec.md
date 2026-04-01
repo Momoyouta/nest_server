@@ -23,9 +23,15 @@ TBD - created by archiving change add-admin-course-crud. Update Purpose after ar
 
 创建逻辑 MUST 从 ALS 获取操作者 userId 并写入 creator_id；新建课程 status MUST 固定为 CourseStatusMap.UNPUBLISHED(0)。学校管理员 MUST 自动使用自身所属 school_id；平台管理员 MUST 显式传入 school_id 并通过学校存在性校验。
 
-#### Scenario: 学校管理员创建课程成功
+系统 MUST 在课程创建成功后，在文件存储系统中自动创建该课程的专属目录结构，路径为 `fileStore/schools/{school_id}/courses/{course_id}/`，且下属子目录包含：
+- `documents/` (用于存放课程资料)
+- `images/` (用于存放课程图片资源)
+- `chapters/` (用于存放章节关联资源)
+- `homework/` (用于存放学生作业提交数据)
+
+#### Scenario: 学校管理员创建课程并自动生成目录
 - **WHEN** 学校管理员提交合法课程名称并调用创建接口
-- **THEN** 系统使用其所属 school_id 创建课程，creator_id 为 ALS 用户 ID，且 status 为未发布
+- **THEN** 系统创建课程记录，并在文件存储中自动生成 documents、images、chapters、homework 四个子目录
 
 #### Scenario: 平台管理员缺失 school_id
 - **WHEN** 平台管理员调用创建接口但未提供 school_id
@@ -47,6 +53,28 @@ TBD - created by archiving change add-admin-course-crud. Update Purpose after ar
 #### Scenario: 学校管理员更新非本校课程
 - **WHEN** 学校管理员尝试更新 school_id 不属于本校的课程
 - **THEN** 系统返回 403 或 400 并拒绝更新
+
+### Requirement: 系统必须提供独立的课程封面更新接口并支持文件迁移
+系统 SHALL 提供 PUT /course/updateCourseCoverAdmin 接口向管理端。UpdateCourseCoverDto MUST 包含：
+- id: 必填，课程 ID，@IsString @IsNotEmpty
+- temp_path: 可选，上传至临时目录的文件相对路径（如 `uploads/temp/images/xxx.png`）。若为空则表示删除当前课程封面。
+
+处理逻辑 MUST：
+1. 校验课程存在及操作者权限。
+2. 若 `temp_path` 不为空：
+   - 将该文件从临时目录移动至 `fileStore/schools/{school_id}/courses/{course_id}/images/` 目录下并重命名为 `banner.png`。
+   - 更新 `cover_img` 为持久化相对路径。
+3. 若 `temp_path` 为空：
+   - 删除该课程物理存在的 `banner.png` 文件（若有）。
+   - 将 `cover_img` 设置为空。
+
+#### Scenario: 管理员成功更新课程封面
+- **WHEN** 管理员传入存在的课程 id 与合法临时文件路径
+- **THEN** 系统将文件移至课程 images 目录并命名为 banner.png，更新数据库后返回 updated=true
+
+#### Scenario: 管理员删除课程封面
+- **WHEN** 管理员传入存在的课程 id 但 `temp_path` 为空
+- **THEN** 系统删除物理文件并清空数据库封面路径
 
 ### Requirement: 系统必须同时支持课程硬删除与软删除
 系统 SHALL 提供两个删除接口：DELETE /course/hardDeleteCourseAdmin/:id 与 PUT /course/softDeleteCourseAdmin/:id。

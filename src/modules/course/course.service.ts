@@ -30,6 +30,9 @@ import {
 import { CourseStatusMap } from '@/common/utils/course.map';
 import { PlatformAdminRoles, SchoolAdminRoles } from '@/common/utils/role.map';
 import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
+import { StorageService } from '../file/storage/storage.service';
+import { FilePathTemplate } from '@/common/utils/file-path.map';
+import { UpdateCourseCoverDto } from '@/modules/course/dto/CourseAdmin.dto';
 
 interface CourseListRowRaw {
   id: string;
@@ -81,6 +84,7 @@ export class CourseService {
     private readonly schoolRepository: Repository<School>,
     private readonly dataSource: DataSource,
     private readonly alsService: AsyncLocalstorageService,
+    private readonly storageService: StorageService,
   ) {}
 
   async createCourseAdmin(payload: CreateCourseDto): Promise<{ id: string }> {
@@ -101,7 +105,45 @@ export class CourseService {
     });
 
     const saved = await this.courseRepository.save(course);
+
+    // 创建存储目录
+    this.storageService.createCourseDir({
+      schoolId: saved.school_id,
+      courseId: saved.id,
+    });
+
     return { id: saved.id };
+  }
+
+  async updateCourseCoverAdmin(
+    payload: UpdateCourseCoverDto,
+  ): Promise<{ id: string; updated: true }> {
+    const user = await this.getCurrentUserOrThrow();
+    const course = await this.findCourseWithPermissionOrThrow(payload.id, user);
+
+    const destSegments = [
+      'schools',
+      String(course.school_id),
+      'courses',
+      String(course.id),
+      'images',
+      'banner.png',
+    ];
+    const destPath = destSegments.join('/');
+
+    if (!payload.temp_path) {
+      // 如果没有传临时路径，说明是要删除现有封面
+      this.storageService.deleteFile(destPath);
+      course.cover_img = undefined;
+    } else {
+      // 移动文件并重命名为 banner.png
+      this.storageService.moveFile(payload.temp_path, destPath);
+      // 更新数据库，存储相对路径
+      course.cover_img = `/${destPath}`;
+    }
+
+    await this.courseRepository.save(course);
+    return { id: course.id, updated: true };
   }
 
   async updateCourseAdmin(
