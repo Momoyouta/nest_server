@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { BeforeInsert, BeforeUpdate, Column, Entity, PrimaryColumn } from 'typeorm';
+import {
+  BeforeInsert,
+  BeforeUpdate,
+  Column,
+  Entity,
+  PrimaryColumn,
+} from 'typeorm';
 import { v4 } from 'uuid';
 
 @Entity('course_lesson')
@@ -17,8 +23,8 @@ export class CourseLesson {
   title: string;
 
   @Column({ type: 'varchar', length: 500, nullable: true })
-  @ApiProperty({ description: '视频资源id', required: false })
-  resource_id?: string;
+  @ApiProperty({ description: '视频资源id', required: false, nullable: true })
+  resource_id?: string | null;
 
   @Column({ type: 'int', default: 0 })
   @ApiProperty({ description: '排序值', default: 0 })

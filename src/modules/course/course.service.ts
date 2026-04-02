@@ -22,17 +22,29 @@ import { User } from '@/database/entities/user.entity';
 import { DataSource, In, Repository } from 'typeorm';
 import {
   CourseBasicResponseDto,
+  CourseOutlineDraftDto,
   CourseListItemDto,
   CourseListQueryDto,
   CreateCourseDto,
+  PublishCourseOutlineDto,
+  PublishCourseOutlineResponseDto,
+  QuickUpdateChapterTitleDto,
+  QuickUpdateChapterTitleResponseDto,
+  QuickUpdateLessonDto,
+  QuickUpdateLessonResponseDto,
+  SaveCourseDraftDto,
+  SaveCourseDraftResponseDto,
+  UpdateCourseCoverDto,
   UpdateCourseDto,
 } from '@/modules/course/dto/CourseAdmin.dto';
 import { CourseStatusMap } from '@/common/utils/course.map';
 import { PlatformAdminRoles, SchoolAdminRoles } from '@/common/utils/role.map';
 import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
 import { StorageService } from '../file/storage/storage.service';
-import { FilePathTemplate } from '@/common/utils/file-path.map';
-import { UpdateCourseCoverDto } from '@/modules/course/dto/CourseAdmin.dto';
+import {
+  CourseOutlineSource,
+  CourseOutlineSourceMap,
+} from '@/common/utils/course-outline.map';
 
 interface CourseListRowRaw {
   id: string;
@@ -49,6 +61,18 @@ interface CourseListRowRaw {
 interface TeacherNameRowRaw {
   course_id: string;
   teacher_name: string | null;
+}
+
+interface PublishIdMappingItem {
+  temp_id: string;
+  real_id: string;
+}
+
+interface OutlineDraftRaw {
+  course_id?: unknown;
+  school_id?: unknown;
+  status?: unknown;
+  chapters?: unknown;
 }
 
 @Injectable()
@@ -166,6 +190,330 @@ export class CourseService {
     }
     await this.courseRepository.save(course);
     return { id: course.id, updated: true };
+  }
+
+  async saveCourseDraftAdmin(
+    payload: SaveCourseDraftDto,
+  ): Promise<SaveCourseDraftResponseDto> {
+    const user = await this.getCurrentUserOrThrow();
+    const course = await this.findCourseWithPermissionOrThrow(
+      payload.course_id,
+      user,
+    );
+    this.validateDraftAgainstCourse(payload.draft_content, course);
+
+    course.draft_content = payload.draft_content as unknown as Record<
+      string,
+      unknown
+    >;
+    await this.courseRepository.save(course);
+
+    return {
+      course_id: course.id,
+      updated: true,
+    };
+  }
+
+  async publishCourseOutlineAdmin(
+    payload: PublishCourseOutlineDto,
+  ): Promise<PublishCourseOutlineResponseDto> {
+    const user = await this.getCurrentUserOrThrow();
+    const course = await this.findCourseWithPermissionOrThrow(
+      payload.course_id,
+      user,
+    );
+    this.validateDraftAgainstCourse(payload.draft_content, course);
+
+    return this.dataSource.transaction(async (manager) => {
+      const courseRepository = manager.getRepository(Course);
+      const chapterRepository = manager.getRepository(CourseChapter);
+      const lessonRepository = manager.getRepository(CourseLesson);
+
+      const courseEntity = await courseRepository.findOneBy({ id: course.id });
+      if (!courseEntity) {
+        throw new NotFoundException('课程不存在');
+      }
+
+      // 先落草稿，再执行后续发布差异同步（同事务，失败会整体回滚）
+      courseEntity.draft_content = payload.draft_content as unknown as Record<
+        string,
+        unknown
+      >;
+      await courseRepository.save(courseEntity);
+
+      const existingChapters = await chapterRepository.find({
+        where: { course_id: course.id },
+      });
+      const existingChapterMap = new Map(
+        existingChapters.map((chapter) => [chapter.id, chapter]),
+      );
+      const keepChapterIds = new Set<string>();
+      const chapterIdMap = new Map<string, string>();
+      const chapterMappings: PublishIdMappingItem[] = [];
+
+      for (const chapterItem of payload.draft_content.chapters || []) {
+        const chapterId = String(chapterItem.chapter_id);
+        if (this.isTempId(chapterId)) {
+          const createdChapter = chapterRepository.create({
+            course_id: course.id,
+            title: chapterItem.title,
+            sort_order: Number(chapterItem.sort_order ?? 0),
+          });
+          const savedChapter = await chapterRepository.save(createdChapter);
+          keepChapterIds.add(savedChapter.id);
+          chapterIdMap.set(chapterId, savedChapter.id);
+          chapterMappings.push({
+            temp_id: chapterId,
+            real_id: savedChapter.id,
+          });
+        } else {
+          const chapter = existingChapterMap.get(chapterId);
+          if (!chapter) {
+            throw new BadRequestException(
+              `章节ID不合法: ${chapterId}。builder新建章节必须使用temp前缀ID（如 temp_chapter_时间戳_随机串）`,
+            );
+          }
+          chapter.title = chapterItem.title;
+          chapter.sort_order = Number(chapterItem.sort_order ?? 0);
+          const savedChapter = await chapterRepository.save(chapter);
+          keepChapterIds.add(savedChapter.id);
+          chapterIdMap.set(chapterId, savedChapter.id);
+        }
+      }
+
+      const existingChapterIds = existingChapters.map((chapter) => chapter.id);
+      const existingLessons =
+        existingChapterIds.length > 0
+          ? await lessonRepository.find({
+              where: { chapter_id: In(existingChapterIds) },
+            })
+          : [];
+      const existingLessonMap = new Map(
+        existingLessons.map((lesson) => [lesson.id, lesson]),
+      );
+      const keepLessonIds = new Set<string>();
+      const lessonMappings: PublishIdMappingItem[] = [];
+
+      for (const chapterItem of payload.draft_content.chapters || []) {
+        const chapterId = String(chapterItem.chapter_id);
+        const realChapterId = chapterIdMap.get(chapterId);
+        if (!realChapterId) {
+          throw new BadRequestException(`章节ID映射不存在: ${chapterId}`);
+        }
+
+        for (const lessonItem of chapterItem.lessons || []) {
+          const lessonId = String(lessonItem.lesson_id);
+          if (this.isTempId(lessonId)) {
+            const createdLesson: CourseLesson = lessonRepository.create({
+              chapter_id: realChapterId,
+              title: lessonItem.title,
+              description: lessonItem.description || '',
+              resource_id: lessonItem.resource_id ?? null,
+              duration: Number(lessonItem.duration ?? 0),
+              sort_order: Number(lessonItem.sort_order ?? 0),
+            });
+            const savedLesson: CourseLesson =
+              await lessonRepository.save(createdLesson);
+            keepLessonIds.add(savedLesson.id);
+            lessonMappings.push({
+              temp_id: lessonId,
+              real_id: savedLesson.id,
+            });
+          } else {
+            const lesson = existingLessonMap.get(lessonId);
+            if (!lesson) {
+              throw new BadRequestException(
+                `课时ID不合法: ${lessonId}。builder新建课时必须使用temp前缀ID（如 temp_lesson_时间戳_随机串）`,
+              );
+            }
+            lesson.chapter_id = realChapterId;
+            lesson.title = lessonItem.title;
+            lesson.description = lessonItem.description || '';
+            lesson.resource_id = lessonItem.resource_id ?? null;
+            lesson.duration = Number(lessonItem.duration ?? 0);
+            lesson.sort_order = Number(lessonItem.sort_order ?? 0);
+            const savedLesson = await lessonRepository.save(lesson);
+            keepLessonIds.add(savedLesson.id);
+          }
+        }
+      }
+
+      const lessonIdsToDelete = existingLessons
+        .filter((lesson) => !keepLessonIds.has(lesson.id))
+        .map((lesson) => lesson.id);
+
+      if (lessonIdsToDelete.length > 0) {
+        await lessonRepository.delete({ id: In(lessonIdsToDelete) });
+      }
+
+      const chapterIdsToDelete = existingChapters
+        .filter((chapter) => !keepChapterIds.has(chapter.id))
+        .map((chapter) => chapter.id);
+
+      if (chapterIdsToDelete.length > 0) {
+        await lessonRepository.delete({ chapter_id: In(chapterIdsToDelete) });
+        await chapterRepository.delete({ id: In(chapterIdsToDelete) });
+      }
+
+      courseEntity.status = Number(CourseStatusMap.PUBLISHED);
+      await courseRepository.save(courseEntity);
+
+      const chapter_count = await chapterRepository.count({
+        where: { course_id: course.id },
+      });
+
+      const lesson_count =
+        chapter_count === 0
+          ? 0
+          : await lessonRepository
+              .createQueryBuilder('lesson')
+              .innerJoin(
+                CourseChapter,
+                'chapter',
+                'chapter.id = lesson.chapter_id',
+              )
+              .where('chapter.course_id = :courseId', { courseId: course.id })
+              .getCount();
+
+      return {
+        course_id: course.id,
+        published: true,
+        chapter_count,
+        lesson_count,
+        id_mappings: {
+          chapters: chapterMappings,
+          lessons: lessonMappings,
+        },
+      };
+    });
+  }
+
+  async updateChapterTitleQuickAdmin(
+    payload: QuickUpdateChapterTitleDto,
+  ): Promise<QuickUpdateChapterTitleResponseDto> {
+    const user = await this.getCurrentUserOrThrow();
+    const course = await this.findCourseWithPermissionOrThrow(
+      payload.course_id,
+      user,
+    );
+    this.validateDraftAgainstCourse(payload.draft_content, course);
+
+    const chapter = await this.courseChapterRepository.findOne({
+      where: {
+        id: payload.chapter.chapter_id,
+        course_id: course.id,
+      },
+    });
+
+    if (!chapter) {
+      throw new NotFoundException('章节不存在');
+    }
+
+    course.draft_content = payload.draft_content as unknown as Record<
+      string,
+      unknown
+    >;
+    await this.courseRepository.save(course);
+
+    chapter.title = payload.chapter.title;
+    await this.courseChapterRepository.save(chapter);
+
+    return {
+      course_id: course.id,
+      chapter_id: chapter.id,
+      updated: true,
+    };
+  }
+
+  async updateLessonQuickAdmin(
+    payload: QuickUpdateLessonDto,
+  ): Promise<QuickUpdateLessonResponseDto> {
+    const user = await this.getCurrentUserOrThrow();
+    const course = await this.findCourseWithPermissionOrThrow(
+      payload.course_id,
+      user,
+    );
+    this.validateDraftAgainstCourse(payload.draft_content, course);
+
+    const chapter = await this.courseChapterRepository.findOne({
+      where: {
+        id: payload.lesson.chapter_id,
+        course_id: course.id,
+      },
+    });
+
+    if (!chapter) {
+      throw new NotFoundException('章节不存在');
+    }
+
+    const lesson = await this.courseLessonRepository
+      .createQueryBuilder('lesson')
+      .innerJoin(CourseChapter, 'chapter', 'chapter.id = lesson.chapter_id')
+      .where('lesson.id = :lessonId', { lessonId: payload.lesson.lesson_id })
+      .andWhere('chapter.course_id = :courseId', { courseId: course.id })
+      .getOne();
+
+    if (!lesson) {
+      throw new NotFoundException('课时不存在');
+    }
+
+    course.draft_content = payload.draft_content as unknown as Record<
+      string,
+      unknown
+    >;
+    await this.courseRepository.save(course);
+
+    lesson.chapter_id = chapter.id;
+    lesson.title = payload.lesson.title;
+    lesson.description = payload.lesson.description || '';
+    lesson.resource_id = payload.lesson.resource_id ?? null;
+    lesson.duration = Number(payload.lesson.duration ?? 0);
+    lesson.sort_order = Number(payload.lesson.sort_order ?? 0);
+
+    await this.courseLessonRepository.save(lesson);
+
+    return {
+      course_id: course.id,
+      lesson_id: lesson.id,
+      updated: true,
+    };
+  }
+
+  async getCourseLessonOutline(
+    id: string,
+    source?: string,
+  ): Promise<CourseOutlineDraftDto> {
+    const course = await this.courseRepository.findOneBy({ id });
+    if (!course) {
+      throw new NotFoundException('课程不存在');
+    }
+
+    const platform = this.alsService.getStore()?.platform;
+    const adminSource: CourseOutlineSource =
+      source === CourseOutlineSourceMap.PUBLISHED
+        ? CourseOutlineSourceMap.PUBLISHED
+        : CourseOutlineSourceMap.DRAFT;
+
+    if (
+      platform === 'admin' &&
+      adminSource !== CourseOutlineSourceMap.PUBLISHED
+    ) {
+      const draft = this.parseDraftContent(course.draft_content);
+      if (draft) {
+        return this.normalizeOutlineDraft(draft, course);
+      }
+    }
+
+    return this.buildOutlineFromDatabase(course);
+  }
+
+  async importPublishedCourseLessonOutlineAdmin(
+    id: string,
+  ): Promise<CourseOutlineDraftDto> {
+    const user = await this.getCurrentUserOrThrow();
+    await this.findCourseWithPermissionOrThrow(id, user);
+
+    return this.getCourseLessonOutline(id, CourseOutlineSourceMap.PUBLISHED);
   }
 
   async softDeleteCourseAdmin(
@@ -420,6 +768,155 @@ export class CourseService {
     return { description: course.description || '' };
   }
 
+  private isTempId(id: string): boolean {
+    return id.startsWith('temp_');
+  }
+
+  private validateDraftAgainstCourse(
+    draft: CourseOutlineDraftDto,
+    course: Course,
+  ): void {
+    if (draft.course_id !== course.id) {
+      throw new BadRequestException('draft_content.course_id 与课程不匹配');
+    }
+
+    if (draft.school_id !== course.school_id) {
+      throw new BadRequestException('draft_content.school_id 与课程不匹配');
+    }
+  }
+
+  private parseDraftContent(
+    draftContent: Course['draft_content'],
+  ): OutlineDraftRaw | null {
+    if (!draftContent) {
+      return null;
+    }
+
+    if (typeof draftContent === 'string') {
+      try {
+        const parsed = JSON.parse(draftContent) as OutlineDraftRaw;
+        return parsed && typeof parsed === 'object' ? parsed : null;
+      } catch {
+        return null;
+      }
+    }
+
+    if (typeof draftContent === 'object') {
+      return draftContent as OutlineDraftRaw;
+    }
+
+    return null;
+  }
+
+  private normalizeOutlineDraft(
+    draft: OutlineDraftRaw,
+    course: Course,
+  ): CourseOutlineDraftDto {
+    const chapters = Array.isArray(draft.chapters) ? draft.chapters : [];
+
+    return {
+      course_id: this.toStringWithFallback(draft.course_id, course.id),
+      school_id: this.toStringWithFallback(draft.school_id, course.school_id),
+      status: Number(
+        draft.status ?? course.status ?? CourseStatusMap.UNPUBLISHED,
+      ),
+      chapters: chapters.map((chapterItem) => {
+        const chapterObj =
+          chapterItem && typeof chapterItem === 'object'
+            ? (chapterItem as Record<string, unknown>)
+            : {};
+        const lessonItems = Array.isArray(chapterObj.lessons)
+          ? chapterObj.lessons
+          : [];
+
+        return {
+          chapter_id: this.toStringWithFallback(chapterObj.chapter_id, ''),
+          title: this.toStringWithFallback(chapterObj.title, ''),
+          sort_order: Number(chapterObj.sort_order ?? 0),
+          lessons: lessonItems.map((lessonItem) => {
+            const lessonObj =
+              lessonItem && typeof lessonItem === 'object'
+                ? (lessonItem as Record<string, unknown>)
+                : {};
+            return {
+              lesson_id: this.toStringWithFallback(lessonObj.lesson_id, ''),
+              title: this.toStringWithFallback(lessonObj.title, ''),
+              description: this.toStringWithFallback(lessonObj.description, ''),
+              sort_order: Number(lessonObj.sort_order ?? 0),
+              resource_id:
+                lessonObj.resource_id === null ||
+                lessonObj.resource_id === undefined ||
+                lessonObj.resource_id === ''
+                  ? null
+                  : this.toStringWithFallback(lessonObj.resource_id, ''),
+              duration: Number(lessonObj.duration ?? 0),
+            };
+          }),
+        };
+      }),
+    };
+  }
+
+  private async buildOutlineFromDatabase(
+    course: Course,
+  ): Promise<CourseOutlineDraftDto> {
+    const chapters = await this.courseChapterRepository.find({
+      where: { course_id: course.id },
+      order: {
+        sort_order: 'ASC',
+        create_time: 'ASC',
+      },
+    });
+
+    const chapterIds = chapters.map((chapter) => chapter.id);
+    const lessons =
+      chapterIds.length > 0
+        ? await this.courseLessonRepository.find({
+            where: { chapter_id: In(chapterIds) },
+            order: {
+              sort_order: 'ASC',
+              create_time: 'ASC',
+            },
+          })
+        : [];
+
+    const lessonsMap = new Map<string, CourseLesson[]>();
+    lessons.forEach((lesson) => {
+      if (!lessonsMap.has(lesson.chapter_id)) {
+        lessonsMap.set(lesson.chapter_id, []);
+      }
+      lessonsMap.get(lesson.chapter_id)?.push(lesson);
+    });
+
+    return {
+      course_id: course.id,
+      school_id: course.school_id,
+      status: Number(course.status ?? CourseStatusMap.UNPUBLISHED),
+      chapters: chapters.map((chapter) => ({
+        chapter_id: chapter.id,
+        title: chapter.title,
+        sort_order: Number(chapter.sort_order ?? 0),
+        lessons: (lessonsMap.get(chapter.id) || []).map((lesson) => ({
+          lesson_id: lesson.id,
+          title: lesson.title,
+          description: lesson.description || '',
+          sort_order: Number(lesson.sort_order ?? 0),
+          resource_id: lesson.resource_id ?? null,
+          duration: Number(lesson.duration ?? 0),
+        })),
+      })),
+    };
+  }
+
+  private toStringWithFallback(value: unknown, fallback: string): string {
+    if (typeof value === 'string') {
+      return value;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    return fallback;
+  }
 
   private async getCurrentUserOrThrow(): Promise<User> {
     const userId = this.alsService.getUserId();

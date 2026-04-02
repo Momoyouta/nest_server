@@ -1,8 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsOptional, IsString, IsInt } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsInt,
+} from 'class-validator';
 
 export class InvitationDataDto {
-  @ApiProperty({ description: '邀请码类型 (0:老师加入学校, 1:学生加入学校, 2:学生加入课程)' })
+  @ApiProperty({
+    description: '邀请码类型 (0:老师加入学校, 1:学生加入学校, 2:学生加入课程)',
+  })
   @IsNumber()
   @IsNotEmpty()
   type: number;
@@ -39,7 +47,9 @@ export class InvitationDataDto {
 }
 
 export class CreateInviteDto {
-  @ApiProperty({ description: '邀请码类型 (0:老师加入学校, 1:学生加入学校, 2:学生加入课程)' })
+  @ApiProperty({
+    description: '邀请码类型 (0:老师加入学校, 1:学生加入学校, 2:学生加入课程)',
+  })
   @IsNumber()
   @IsNotEmpty()
   type: number;
@@ -107,4 +117,3 @@ export class InvitationQueryDto {
   @IsOptional()
   pageSize?: number = 10;
 }
-

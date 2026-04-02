@@ -29,7 +29,7 @@ export class AuthService {
     private readonly dataSource: DataSource,
     private readonly invitationService: InvitationService,
     private readonly userService: UserService,
-  ) { }
+  ) {}
 
   async login(pwd: string, account: string) {
     const user = await this.userRepository.findOne({
@@ -54,8 +54,14 @@ export class AuthService {
     const { account, inviteCode, role_id } = registerUserDto;
 
     // 1. 验证角色 (仅允许教师和学生)
-    if (role_id !== AdminRolesMap.teacher && role_id !== AdminRolesMap.student) {
-      throw new HttpException('该接口仅允许注册教师或学生', HttpStatus.BAD_REQUEST);
+    if (
+      role_id !== AdminRolesMap.teacher &&
+      role_id !== AdminRolesMap.student
+    ) {
+      throw new HttpException(
+        '该接口仅允许注册教师或学生',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     // 2. 账号唯一性检查
@@ -80,10 +86,16 @@ export class AuthService {
 
     // 4. 校验邀请码类型与请求角色是否匹配 (0:老师, 1:学生)
     if (role_id === AdminRolesMap.teacher && inviteData.type !== 0) {
-      throw new HttpException('邀请码类型与教师角色不匹配', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        '邀请码类型与教师角色不匹配',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     if (role_id === AdminRolesMap.student && inviteData.type !== 1) {
-      throw new HttpException('邀请码类型与学生角色不匹配', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        '邀请码类型与学生角色不匹配',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     // 5. 调用 UserService 进行创建
@@ -175,13 +187,22 @@ export class AuthService {
       let schoolId: string | undefined = undefined;
       const roleIdArr = payload.roleIds ? payload.roleIds.split(',') : [];
       if (roleIdArr.includes(AdminRolesMap.student)) {
-        const student = await this.dataSource.getRepository(Student).findOne({ where: { user_id: payload.userId } });
+        const student = await this.dataSource
+          .getRepository(Student)
+          .findOne({ where: { user_id: payload.userId } });
         if (student?.school_id) schoolId = String(student.school_id);
       } else if (roleIdArr.includes(AdminRolesMap.teacher)) {
-        const teacher = await this.dataSource.getRepository(Teacher).findOne({ where: { user_id: payload.userId } });
+        const teacher = await this.dataSource
+          .getRepository(Teacher)
+          .findOne({ where: { user_id: payload.userId } });
         if (teacher?.school_id) schoolId = String(teacher.school_id);
-      } else if (roleIdArr.includes(AdminRolesMap.school_admin) || roleIdArr.includes(AdminRolesMap.school_root)) {
-        const schoolAdmin = await this.dataSource.getRepository(SchoolAdmin).findOne({ where: { user_id: payload.userId } });
+      } else if (
+        roleIdArr.includes(AdminRolesMap.school_admin) ||
+        roleIdArr.includes(AdminRolesMap.school_root)
+      ) {
+        const schoolAdmin = await this.dataSource
+          .getRepository(SchoolAdmin)
+          .findOne({ where: { user_id: payload.userId } });
         if (schoolAdmin?.school_id) schoolId = String(schoolAdmin.school_id);
       }
 
@@ -276,13 +297,22 @@ export class AuthService {
     let schoolId: string | undefined = undefined;
     const roleIdArr = user.role_id ? user.role_id.split(',') : [];
     if (roleIdArr.includes(AdminRolesMap.student)) {
-      const student = await this.dataSource.getRepository(Student).findOne({ where: { user_id: user.id } });
+      const student = await this.dataSource
+        .getRepository(Student)
+        .findOne({ where: { user_id: user.id } });
       if (student?.school_id) schoolId = String(student.school_id);
     } else if (roleIdArr.includes(AdminRolesMap.teacher)) {
-      const teacher = await this.dataSource.getRepository(Teacher).findOne({ where: { user_id: user.id } });
+      const teacher = await this.dataSource
+        .getRepository(Teacher)
+        .findOne({ where: { user_id: user.id } });
       if (teacher?.school_id) schoolId = String(teacher.school_id);
-    } else if (roleIdArr.includes(AdminRolesMap.school_admin) || roleIdArr.includes(AdminRolesMap.school_root)) {
-      const schoolAdmin = await this.dataSource.getRepository(SchoolAdmin).findOne({ where: { user_id: user.id } });
+    } else if (
+      roleIdArr.includes(AdminRolesMap.school_admin) ||
+      roleIdArr.includes(AdminRolesMap.school_root)
+    ) {
+      const schoolAdmin = await this.dataSource
+        .getRepository(SchoolAdmin)
+        .findOne({ where: { user_id: user.id } });
       if (schoolAdmin?.school_id) schoolId = String(schoolAdmin.school_id);
     }
 
@@ -316,13 +346,22 @@ export class AuthService {
       let schoolId: string | undefined = undefined;
       const roleIdArr = payload.roleIds ? payload.roleIds.split(',') : [];
       if (roleIdArr.includes(AdminRolesMap.student)) {
-        const student = await this.dataSource.getRepository(Student).findOne({ where: { user_id: payload.userId } });
+        const student = await this.dataSource
+          .getRepository(Student)
+          .findOne({ where: { user_id: payload.userId } });
         if (student?.school_id) schoolId = String(student.school_id);
       } else if (roleIdArr.includes(AdminRolesMap.teacher)) {
-        const teacher = await this.dataSource.getRepository(Teacher).findOne({ where: { user_id: payload.userId } });
+        const teacher = await this.dataSource
+          .getRepository(Teacher)
+          .findOne({ where: { user_id: payload.userId } });
         if (teacher?.school_id) schoolId = String(teacher.school_id);
-      } else if (roleIdArr.includes(AdminRolesMap.school_admin) || roleIdArr.includes(AdminRolesMap.school_root)) {
-        const schoolAdmin = await this.dataSource.getRepository(SchoolAdmin).findOne({ where: { user_id: payload.userId } });
+      } else if (
+        roleIdArr.includes(AdminRolesMap.school_admin) ||
+        roleIdArr.includes(AdminRolesMap.school_root)
+      ) {
+        const schoolAdmin = await this.dataSource
+          .getRepository(SchoolAdmin)
+          .findOne({ where: { user_id: payload.userId } });
         if (schoolAdmin?.school_id) schoolId = String(schoolAdmin.school_id);
       }
 
@@ -333,7 +372,10 @@ export class AuthService {
         schoolId: schoolId,
       };
     } catch (e) {
-      throw new HttpException('管理员token无效或已过期', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        '管理员token无效或已过期',
+        HttpStatus.BAD_REQUEST,
+      );
     }
   }
 

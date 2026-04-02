@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+  ForbiddenException,
+} from '@nestjs/common';
 import { StudentService } from '@/modules/student/student.service';
 import { BaseQueryDto } from '../../common/dto/base-query.dto';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
@@ -17,7 +29,7 @@ export class StudentController {
     private readonly studentService: StudentService,
     private readonly alsService: AsyncLocalstorageService,
     private readonly userService: UserService,
-  ) { }
+  ) {}
 
   @Get()
   @AdminAuth()
@@ -45,7 +57,7 @@ export class StudentController {
 
     // 权限校验：本人或管理员
     const userRoles = await this.userService.getUserRole(userId);
-    const roleIds = userRoles.map(r => r.id.toString());
+    const roleIds = userRoles.map((r) => r.id.toString());
     const isAdmin = _.intersection(roleIds, AdminRoles).length > 0;
 
     if (!isAdmin && student.user_id !== userId) {

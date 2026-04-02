@@ -1,10 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsEnum, IsNotEmpty, IsNumber, IsOptional } from 'class-validator';
-import { FileUploadScenario } from '../../../../common/utils/file-scenario.map'
+import { FileUploadScenario } from '../../../../common/utils/file-scenario.map';
 
 export class UploadImageDto {
-
   @ApiPropertyOptional({ description: '学校ID', example: 1 })
   @IsOptional()
   @Type(() => Number)
@@ -15,7 +14,7 @@ export class UploadImageDto {
     description: '上传业务场景',
     enum: FileUploadScenario,
     enumName: 'FileUploadScenario',
-    example: FileUploadScenario.AVATAR
+    example: FileUploadScenario.AVATAR,
   })
   @IsEnum(FileUploadScenario)
   @IsNotEmpty()

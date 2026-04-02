@@ -13,10 +13,19 @@ export class StudentService {
     private studentRepository: Repository<Student>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
-  ) { }
+  ) {}
 
   async findAll(query: BaseQueryDto) {
-    const { page = 1, pageSize = 10, id, name, phone, school_id, student_number, status } = query as any;
+    const {
+      page = 1,
+      pageSize = 10,
+      id,
+      name,
+      phone,
+      school_id,
+      student_number,
+      status,
+    } = query as any;
     const qb = this.studentRepository.createQueryBuilder('student');
     qb.leftJoinAndSelect('student.user', 'user');
 
@@ -27,7 +36,9 @@ export class StudentService {
       qb.andWhere('student.id = :id', { id });
     }
     if (student_number) {
-      qb.andWhere('student.student_number = :student_number', { student_number });
+      qb.andWhere('student.student_number = :student_number', {
+        student_number,
+      });
     }
     if (name) {
       qb.andWhere('user.name LIKE :name', { name: `%${name}%` });
@@ -44,7 +55,7 @@ export class StudentService {
 
     const [items, total] = await qb.getManyAndCount();
 
-    const flatItems = items.map(item => {
+    const flatItems = items.map((item) => {
       const { user, id: student_id, ...rest } = item as any;
       if (user) {
         return { student_id, ...rest, ...user };
@@ -68,26 +79,44 @@ export class StudentService {
     const student = await this.findOne(userId);
     if (data.user) {
       if (data.user.password) {
-        data.user.password = await bcrypt.hash(String(data.user.password), await bcrypt.genSalt(10));
+        data.user.password = await bcrypt.hash(
+          String(data.user.password),
+          await bcrypt.genSalt(10),
+        );
       }
       data.user.update_time = String(Math.floor(Date.now() / 1000));
       await this.userRepository.update(student.user_id, data.user);
       await this.studentRepository.update(student.id, data.student || data);
     } else {
-      const userFields = this.userRepository.metadata.columns.map(c => c.propertyName);
+      const userFields = this.userRepository.metadata.columns.map(
+        (c) => c.propertyName,
+      );
       const userData: any = {};
       const studentData: any = {};
-      
-      const excludeFields = ['id', 'user_id', 'organization', 'roleNames', 'school_admin_id', 'institution', 'create_time', 'update_time', 'user'];
+
+      const excludeFields = [
+        'id',
+        'user_id',
+        'organization',
+        'roleNames',
+        'school_admin_id',
+        'institution',
+        'create_time',
+        'update_time',
+        'user',
+      ];
 
       const now = String(Math.floor(Date.now() / 1000));
       for (const ObjectKey of Object.keys(data)) {
         const key = ObjectKey;
         if (excludeFields.includes(key)) continue;
-        
+
         if (userFields.includes(key)) {
           if (key === 'password' && data[key]) {
-            userData[key] = await bcrypt.hash(String(data[key]), await bcrypt.genSalt(10));
+            userData[key] = await bcrypt.hash(
+              String(data[key]),
+              await bcrypt.genSalt(10),
+            );
           } else {
             userData[key] = data[key];
           }

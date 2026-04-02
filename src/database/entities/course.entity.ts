@@ -1,6 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { CourseStatusMap, CourseStatusValues } from '@/common/utils/course.map';
-import { BeforeInsert, BeforeUpdate, Column, Entity, PrimaryColumn } from 'typeorm';
+import {
+  BeforeInsert,
+  BeforeUpdate,
+  Column,
+  Entity,
+  PrimaryColumn,
+} from 'typeorm';
 import { v4 } from 'uuid';
 
 @Entity('course')
@@ -29,7 +35,25 @@ export class Course {
   @ApiProperty({ description: '课程描述', required: false })
   description?: string;
 
-  @Column({ type: 'tinyint', nullable: true, default: CourseStatusMap.UNPUBLISHED })
+  @Column({ type: 'json', nullable: true })
+  @ApiProperty({
+    description: '课程大纲草稿 JSON',
+    required: false,
+    type: 'string',
+    example: {
+      course_id: '1001',
+      school_id: 'sch_001',
+      status: 1,
+      chapters: [],
+    },
+  })
+  draft_content?: Record<string, unknown> | null;
+
+  @Column({
+    type: 'tinyint',
+    nullable: true,
+    default: CourseStatusMap.UNPUBLISHED,
+  })
   @ApiProperty({
     description: '课程状态: 0-未发布, 1-已发布',
     required: false,

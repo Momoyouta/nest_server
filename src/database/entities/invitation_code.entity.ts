@@ -2,14 +2,16 @@ import { Entity, Column, PrimaryColumn, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('invitation_code')
 export class InvitationCode {
-
   @PrimaryGeneratedColumn()
-  id: number
+  id: number;
 
   @Column({ length: 16, unique: true, comment: '16位唯一邀请码' })
   code: string;
 
-  @Column({ type: 'tinyint', comment: '0:老师加入学校 1:学生加入学校 2:学生加入课程' })
+  @Column({
+    type: 'tinyint',
+    comment: '0:老师加入学校 1:学生加入学校 2:学生加入课程',
+  })
   type: number;
 
   @Column({ name: 'school_id' })

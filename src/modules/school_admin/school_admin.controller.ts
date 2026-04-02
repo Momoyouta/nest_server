@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+  ForbiddenException,
+} from '@nestjs/common';
 import { SchoolAdminService } from '@/modules/school_admin/school_admin.service';
 import { BaseQueryDto } from '../../common/dto/base-query.dto';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
@@ -11,7 +23,7 @@ import { AdminAuth } from '@/common/decorators/admin-auth.decorator';
 @AdminAuth()
 @Controller('school-admin')
 export class SchoolAdminController {
-  constructor(private readonly schoolAdminService: SchoolAdminService) { }
+  constructor(private readonly schoolAdminService: SchoolAdminService) {}
 
   @Get()
   @ApiOperation({ summary: '获取学校管理员列表' })

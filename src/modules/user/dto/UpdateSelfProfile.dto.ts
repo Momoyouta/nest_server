@@ -70,7 +70,10 @@ export class UpdatePasswordResponseDto {
 }
 
 export class UpdateAvatarResponseDto {
-  @ApiProperty({ description: '头像路径', example: 'users/avatars/user-id.png' })
+  @ApiProperty({
+    description: '头像路径',
+    example: 'users/avatars/user-id.png',
+  })
   avatar: string;
 }
 
@@ -84,6 +87,9 @@ export class UpdatePhoneResponseDto {
   @ApiPropertyOptional({ description: '是否更新成功', example: true })
   updated?: boolean;
 
-  @ApiPropertyOptional({ description: '更新后的手机号', example: '13800138000' })
+  @ApiPropertyOptional({
+    description: '更新后的手机号',
+    example: '13800138000',
+  })
   phone?: string;
 }

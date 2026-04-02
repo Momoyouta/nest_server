@@ -46,7 +46,15 @@ export class UserService {
   login(): any {}
 
   async findAll(query: BaseQueryDto) {
-    const { page = 1, pageSize = 10, id, name, account, phone, role_id } = query as any;
+    const {
+      page = 1,
+      pageSize = 10,
+      id,
+      name,
+      account,
+      phone,
+      role_id,
+    } = query as any;
     const qb = this.usersRepository.createQueryBuilder('user');
 
     qb.select([
@@ -70,7 +78,9 @@ export class UserService {
     }
     if (account || phone) {
       const searchAccount = account || phone;
-      qb.andWhere('user.account LIKE :account', { account: `%${searchAccount}%` });
+      qb.andWhere('user.account LIKE :account', {
+        account: `%${searchAccount}%`,
+      });
     }
     if (role_id) {
       qb.andWhere('FIND_IN_SET(:role_id, user.role_id) > 0', { role_id });
@@ -82,53 +92,70 @@ export class UserService {
     const [list, total] = await qb.getManyAndCount();
 
     const allRoles = await this.roleRepository.find();
-    const roleMap = new Map(allRoles.map(r => [String(r.id), r.nameCN]));
-    const userIds = list.map(u => u.id);
+    const roleMap = new Map(allRoles.map((r) => [String(r.id), r.nameCN]));
+    const userIds = list.map((u) => u.id);
     let studentSchools: Student[] = [];
     let teacherSchools: Teacher[] = [];
     let adminSchools: SchoolAdmin[] = [];
 
     if (userIds.length > 0) {
-      studentSchools = await this.dataSource.getRepository(Student).find({ where: { user_id: In(userIds) } });
-      teacherSchools = await this.dataSource.getRepository(Teacher).find({ where: { user_id: In(userIds) } });
-      adminSchools = await this.dataSource.getRepository(SchoolAdmin).find({ where: { user_id: In(userIds) } });
+      studentSchools = await this.dataSource
+        .getRepository(Student)
+        .find({ where: { user_id: In(userIds) } });
+      teacherSchools = await this.dataSource
+        .getRepository(Teacher)
+        .find({ where: { user_id: In(userIds) } });
+      adminSchools = await this.dataSource
+        .getRepository(SchoolAdmin)
+        .find({ where: { user_id: In(userIds) } });
     }
     const allSchools = await this.dataSource.getRepository(School).find();
-    const schoolMap = new Map(allSchools.map(s => [String(s.id), s.name]));
+    const schoolMap = new Map(allSchools.map((s) => [String(s.id), s.name]));
 
-    const resultList = list.map(user => {
+    const resultList = list.map((user) => {
       const userRoleIds = user.role_id ? user.role_id.split(',') : [];
-      const roleNames = userRoleIds.map(rid => roleMap.get(rid) || rid).join(',');
+      const roleNames = userRoleIds
+        .map((rid) => roleMap.get(rid) || rid)
+        .join(',');
 
       const userSchoolNames = new Set<string>();
 
-      if (userRoleIds.includes(AdminRolesMap.root) || userRoleIds.includes(AdminRolesMap.admin)) {
+      if (
+        userRoleIds.includes(AdminRolesMap.root) ||
+        userRoleIds.includes(AdminRolesMap.admin)
+      ) {
         userSchoolNames.add('平台');
       }
 
-      studentSchools.filter(s => s.user_id === user.id).forEach(s => {
-        if (s.school_id) {
-          const name = schoolMap.get(String(s.school_id));
-          if (name) userSchoolNames.add(name);
-        }
-      });
-      teacherSchools.filter(t => t.user_id === user.id).forEach(t => {
-        if (t.school_id) {
-          const name = schoolMap.get(String(t.school_id));
-          if (name) userSchoolNames.add(name);
-        }
-      });
-      adminSchools.filter(a => a.user_id === user.id).forEach(a => {
-        if (a.school_id) {
-          const name = schoolMap.get(String(a.school_id));
-          if (name) userSchoolNames.add(name);
-        }
-      });
+      studentSchools
+        .filter((s) => s.user_id === user.id)
+        .forEach((s) => {
+          if (s.school_id) {
+            const name = schoolMap.get(String(s.school_id));
+            if (name) userSchoolNames.add(name);
+          }
+        });
+      teacherSchools
+        .filter((t) => t.user_id === user.id)
+        .forEach((t) => {
+          if (t.school_id) {
+            const name = schoolMap.get(String(t.school_id));
+            if (name) userSchoolNames.add(name);
+          }
+        });
+      adminSchools
+        .filter((a) => a.user_id === user.id)
+        .forEach((a) => {
+          if (a.school_id) {
+            const name = schoolMap.get(String(a.school_id));
+            if (name) userSchoolNames.add(name);
+          }
+        });
 
       return {
         ...user,
         roleNames: roleNames,
-        organization: Array.from(userSchoolNames).join(',') || '无'
+        organization: Array.from(userSchoolNames).join(',') || '无',
       };
     });
 
@@ -160,7 +187,10 @@ export class UserService {
    */
   async updateUser(id: string, data: Partial<User>): Promise<User> {
     if (data.password) {
-      data.password = await bcrypt.hash(String(data.password), await bcrypt.genSalt(10));
+      data.password = await bcrypt.hash(
+        String(data.password),
+        await bcrypt.genSalt(10),
+      );
     }
     data.update_time = String(Math.floor(Date.now() / 1000));
     const result = await this.usersRepository.update(id, data);
@@ -232,9 +262,13 @@ export class UserService {
       });
       if (teacher) {
         const school = teacher.school_id
-          ? await this.dataSource.getRepository(School).findOneBy({ id: teacher.school_id })
+          ? await this.dataSource
+              .getRepository(School)
+              .findOneBy({ id: teacher.school_id })
           : null;
-        const teacherRest = { ...teacher } as CurrentTeacherInfoDto & { id?: string };
+        const teacherRest = { ...teacher } as CurrentTeacherInfoDto & {
+          id?: string;
+        };
         delete teacherRest.id;
         teacherInfo = {
           ...teacherRest,
@@ -250,9 +284,13 @@ export class UserService {
       });
       if (student) {
         const school = student.school_id
-          ? await this.dataSource.getRepository(School).findOneBy({ id: student.school_id })
+          ? await this.dataSource
+              .getRepository(School)
+              .findOneBy({ id: student.school_id })
           : null;
-        const studentRest = { ...student } as CurrentStudentInfoDto & { id?: string };
+        const studentRest = { ...student } as CurrentStudentInfoDto & {
+          id?: string;
+        };
         delete studentRest.id;
         studentInfo = {
           ...studentRest,
@@ -489,11 +527,17 @@ export class UserService {
   /**
    * 创建教师（包含用户基础信息）
    */
-  async createTeacherWithUser(userData: Partial<User>, schoolId: string): Promise<User> {
+  async createTeacherWithUser(
+    userData: Partial<User>,
+    schoolId: string,
+  ): Promise<User> {
     return await this.dataSource.transaction(async (manager) => {
       // 1. 创建用户
       if (userData.password) {
-        userData.password = await bcrypt.hash(String(userData.password), await bcrypt.genSalt(10));
+        userData.password = await bcrypt.hash(
+          String(userData.password),
+          await bcrypt.genSalt(10),
+        );
       }
       const now = String(Math.floor(Date.now() / 1000));
       userData.create_time = now;
@@ -527,7 +571,10 @@ export class UserService {
     return await this.dataSource.transaction(async (manager) => {
       // 1. 创建用户
       if (userData.password) {
-        userData.password = await bcrypt.hash(String(userData.password), await bcrypt.genSalt(10));
+        userData.password = await bcrypt.hash(
+          String(userData.password),
+          await bcrypt.genSalt(10),
+        );
       }
       const now = String(Math.floor(Date.now() / 1000));
       userData.create_time = now;

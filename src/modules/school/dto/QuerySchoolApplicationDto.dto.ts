@@ -17,7 +17,10 @@ export class QuerySchoolApplicationDto {
   @Min(1)
   pageSize?: number = 10;
 
-  @ApiProperty({ description: '审核状态(0待审核,1通过,2驳回)', required: false })
+  @ApiProperty({
+    description: '审核状态(0待审核,1通过,2驳回)',
+    required: false,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

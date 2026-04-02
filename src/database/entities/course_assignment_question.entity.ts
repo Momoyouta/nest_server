@@ -3,7 +3,13 @@ import {
   CourseAssignmentQuestionTypeMap,
   CourseAssignmentQuestionTypeValues,
 } from '@/common/utils/course.map';
-import { BeforeInsert, BeforeUpdate, Column, Entity, PrimaryColumn } from 'typeorm';
+import {
+  BeforeInsert,
+  BeforeUpdate,
+  Column,
+  Entity,
+  PrimaryColumn,
+} from 'typeorm';
 import { v4 } from 'uuid';
 
 @Entity('course_assignment_question')
@@ -29,7 +35,10 @@ export class CourseAssignmentQuestion {
   score: number;
 
   @Column({ type: 'json' })
-  @ApiProperty({ description: '题目内容(JSON)', example: { stem: '题干', options: [] } })
+  @ApiProperty({
+    description: '题目内容(JSON)',
+    example: { stem: '题干', options: [] },
+  })
   content: Record<string, any> | Array<any>;
 
   @Column({ type: 'json' })

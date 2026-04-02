@@ -1,4 +1,10 @@
-import { Entity, Column, PrimaryGeneratedColumn, OneToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  OneToOne,
+  JoinColumn,
+} from 'typeorm';
 import { User } from './user.entity';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -7,7 +13,6 @@ export class SchoolAdmin {
   @PrimaryGeneratedColumn('uuid')
   @ApiProperty({ description: '学校管理员ID' })
   id: string;
-
 
   @Column()
   @ApiProperty({ description: '所属学校ID' })

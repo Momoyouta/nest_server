@@ -1,4 +1,11 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, BeforeInsert, BeforeUpdate } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  BeforeInsert,
+  BeforeUpdate,
+} from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 
 @Entity('school')
@@ -39,7 +46,10 @@ export class School {
    * 状态 (0: 审核中, 1: 启用, 2: 禁用)
    */
   @Column({ type: 'smallint', nullable: true, default: 0 })
-  @ApiProperty({ description: '状态 (0: 审核中, 1: 启用, 2: 禁用)', required: false })
+  @ApiProperty({
+    description: '状态 (0: 审核中, 1: 启用, 2: 禁用)',
+    required: false,
+  })
   status: number;
 
   @BeforeInsert()

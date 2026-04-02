@@ -34,10 +34,14 @@ export class CleanupTask {
    * 执行清理逻辑（可复用于手动触发）
    * @returns { cleanedCount, durationMs }
    */
-  async cleanExpiredChunks(): Promise<{ cleanedCount: number; durationMs: number }> {
+  async cleanExpiredChunks(): Promise<{
+    cleanedCount: number;
+    durationMs: number;
+  }> {
     const start = Date.now();
     const expireHours = parseInt(process.env.CHUNK_EXPIRE_HOURS || '24', 10);
-    const cleanedCount = await this.chunkService.cleanExpiredChunks(expireHours);
+    const cleanedCount =
+      await this.chunkService.cleanExpiredChunks(expireHours);
     const durationMs = Date.now() - start;
     return { cleanedCount, durationMs };
   }

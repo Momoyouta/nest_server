@@ -1,6 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { CourseAssignmentStatusMap, CourseAssignmentStatusValues } from '@/common/utils/course.map';
-import { BeforeInsert, BeforeUpdate, Column, Entity, PrimaryColumn } from 'typeorm';
+import {
+  CourseAssignmentStatusMap,
+  CourseAssignmentStatusValues,
+} from '@/common/utils/course.map';
+import {
+  BeforeInsert,
+  BeforeUpdate,
+  Column,
+  Entity,
+  PrimaryColumn,
+} from 'typeorm';
 import { v4 } from 'uuid';
 
 @Entity('course_assignment')
@@ -25,7 +34,11 @@ export class CourseAssignment {
   @ApiProperty({ description: '作业描述', required: false })
   description?: string;
 
-  @Column({ type: 'tinyint', nullable: true, default: CourseAssignmentStatusMap.DRAFT })
+  @Column({
+    type: 'tinyint',
+    nullable: true,
+    default: CourseAssignmentStatusMap.DRAFT,
+  })
   @ApiProperty({
     description: '作业状态: 0-草稿, 1-已发布',
     required: false,

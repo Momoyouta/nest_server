@@ -41,7 +41,9 @@ export class UploadService {
 
       case FileUploadScenario.COURSE_HOMEWORK:
         if (!dto.schoolId || !dto.courseId) {
-          throw new BadRequestException('上传课程作业必须提供 schoolId 和 courseId');
+          throw new BadRequestException(
+            '上传课程作业必须提供 schoolId 和 courseId',
+          );
         }
         if (dto.homeworkId) {
           return `schools/${dto.schoolId}/courses/${dto.courseId}/homework/${dto.homeworkId}`;
@@ -49,7 +51,9 @@ export class UploadService {
         return `schools/${dto.schoolId}/courses/${dto.courseId}/homework`;
       case FileUploadScenario.COURSE_RESOURCE:
         if (!dto.schoolId || !dto.courseId) {
-          throw new BadRequestException('上传课程资源必须提供 schoolId 和 courseId');
+          throw new BadRequestException(
+            '上传课程资源必须提供 schoolId 和 courseId',
+          );
         }
         return `schools/${dto.schoolId}/courses/${dto.courseId}/documents`;
       case FileUploadScenario.TEMP_VIDEO:
@@ -66,7 +70,10 @@ export class UploadService {
    * @param target 相对目标目录（如 schools/1/avatars）
    * @returns 相对存储路径（如 schools/1/avatars/abc123.png）
    */
-  saveImage(file: Express.Multer.File, target: string): { path: string; size: number } {
+  saveImage(
+    file: Express.Multer.File,
+    target: string,
+  ): { path: string; size: number } {
     // 1. 校验文件大小
     if (file.size > MAX_SIZE) {
       throw new PayloadTooLargeException('文件大小超过限制 5MB');
@@ -74,7 +81,9 @@ export class UploadService {
 
     // 2. 校验 MIME 类型
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-      throw new BadRequestException('不支持的文件类型，仅支持 jpg/png/gif/webp');
+      throw new BadRequestException(
+        '不支持的文件类型，仅支持 jpg/png/gif/webp',
+      );
     }
 
     // 3. 防止路径穿越攻击

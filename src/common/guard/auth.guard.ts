@@ -19,17 +19,17 @@ export class AuthGuard implements CanActivate {
     private readonly jwtService: JwtService,
     private reflector: Reflector,
     private alsService: AsyncLocalstorageService,
-  ) { }
+  ) {}
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
     const isPublic = this.reflector.getAllAndOverride<boolean>(API_PUBLIC, [
       context.getHandler(),
       context.getClass(),
     ]);
-    const allowAllJwtAuth = this.reflector.getAllAndOverride<boolean>(ALL_JWT_AUTH, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const allowAllJwtAuth = this.reflector.getAllAndOverride<boolean>(
+      ALL_JWT_AUTH,
+      [context.getHandler(), context.getClass()],
+    );
     const isAdminAuth = this.reflector.getAllAndOverride<boolean>(
       ADMIN_AUTH_KEY,
       [context.getHandler(), context.getClass()],
@@ -45,16 +45,23 @@ export class AuthGuard implements CanActivate {
     const token = request.headers.authorization.split(' ')[1];
     let payload: any;
     try {
+      const context = this.alsService.getStore();
+      let tp;
       if (isAdminAuth) {
         payload = this.jwtService.verify(token, {
           secret: process.env.ADMIN_JWT_SECRET || 'nest_admin_secret',
           algorithms: ['HS256'],
         });
+        if (context) {
+          context.platform = 'admin';
+        }
       } else {
         payload = this.jwtService.verify(token);
+        if (context) {
+          context.platform = 'user';
+        }
       }
       const userId = payload?.userId;
-      const context = this.alsService.getStore();
       if (userId && context) {
         context.userId = payload.userId;
       }
@@ -68,8 +75,11 @@ export class AuthGuard implements CanActivate {
           });
           const userId = payload?.userId;
           const context = this.alsService.getStore();
-          if (userId && context) {
-            context.userId = payload.userId;
+          if (context) {
+            context.platform = 'admin';
+            if (userId) {
+              context.userId = payload.userId;
+            }
           }
           return true;
         } catch (e2) {

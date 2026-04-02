@@ -11,7 +11,7 @@ export class RoleGuard implements CanActivate {
     private reflector: Reflector,
     private readonly userService: UserService,
     private alsService: AsyncLocalstorageService,
-  ) { }
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // 获取装饰器定义的角色要求 (例如: @Role('admin'))
@@ -35,7 +35,7 @@ export class RoleGuard implements CanActivate {
       // 使用 lodash.intersection 判断用户角色标识与接口要求角色是否有交集
       return _.intersection(userRoleIdentifiers, role).length > 0;
     }
-    console.log(role, userId)
+    console.log(role, userId);
     // 若未登录或无 userId，则禁止访问
     return false;
   }

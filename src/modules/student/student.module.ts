@@ -13,4 +13,4 @@ import { UserService } from '../user/user.service';
   providers: [StudentService, UserService],
   exports: [StudentService],
 })
-export class StudentModule { }
+export class StudentModule {}

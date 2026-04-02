@@ -27,7 +27,11 @@ export class CreateSchoolDto {
   @IsString()
   evidence_img_url?: string;
 
-  @ApiProperty({ description: '状态 (0: 审核中, 1: 启用, 2: 禁用)', required: false, default: 0 })
+  @ApiProperty({
+    description: '状态 (0: 审核中, 1: 启用, 2: 禁用)',
+    required: false,
+    default: 0,
+  })
   @IsOptional()
   @IsInt()
   status?: number;

@@ -18,7 +18,9 @@ export const CourseAssignmentStatusMap = {
   PUBLISHED: 1,
 } as const;
 
-export const CourseAssignmentStatusValues = Object.values(CourseAssignmentStatusMap);
+export const CourseAssignmentStatusValues = Object.values(
+  CourseAssignmentStatusMap,
+);
 
 /**
  * 提交状态编码映射
@@ -31,7 +33,9 @@ export const AssignmentSubmissionStatusMap = {
   REVIEWED: 2,
 } as const;
 
-export const AssignmentSubmissionStatusValues = Object.values(AssignmentSubmissionStatusMap);
+export const AssignmentSubmissionStatusValues = Object.values(
+  AssignmentSubmissionStatusMap,
+);
 
 /**
  * 题型编码映射
@@ -45,7 +49,9 @@ export const CourseAssignmentQuestionTypeMap = {
   SHORT_ANSWER: 4,
 } as const;
 
-export const CourseAssignmentQuestionTypeValues = Object.values(CourseAssignmentQuestionTypeMap);
+export const CourseAssignmentQuestionTypeValues = Object.values(
+  CourseAssignmentQuestionTypeMap,
+);
 
 /**
  * tinyint(1) 二值标记

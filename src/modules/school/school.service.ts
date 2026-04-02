@@ -44,7 +44,9 @@ export class SchoolService {
     private readonly storageService: StorageService,
   ) {}
 
-  async applySchool(applySchoolDto: ApplySchoolDto): Promise<SchoolApplication> {
+  async applySchool(
+    applySchoolDto: ApplySchoolDto,
+  ): Promise<SchoolApplication> {
     const schoolApplication = this.schoolApplicationRepository.create({
       school_name: applySchoolDto.school_name,
       school_address: applySchoolDto.school_address,
@@ -60,7 +62,13 @@ export class SchoolService {
   async findAllApplications(
     query: QuerySchoolApplicationDto,
   ): Promise<{ list: SchoolApplication[]; total: number }> {
-    const { page = 1, pageSize = 10, status, school_name, charge_phone } = query;
+    const {
+      page = 1,
+      pageSize = 10,
+      status,
+      school_name,
+      charge_phone,
+    } = query;
 
     const where: any = {};
     if (status !== undefined) where.status = status;
@@ -82,9 +90,10 @@ export class SchoolService {
     reviewDto: ReviewSchoolApplicationDto,
   ): Promise<SchoolApplication> {
     const currentUserId = this.alsService.getUserId();
-    const reviewedBy = currentUserId && /^\d+$/.test(currentUserId)
-      ? Number(currentUserId)
-      : null;
+    const reviewedBy =
+      currentUserId && /^\d+$/.test(currentUserId)
+        ? Number(currentUserId)
+        : null;
 
     if (currentUserId && reviewedBy === null) {
       this.logger.warn(
@@ -127,13 +136,18 @@ export class SchoolService {
           // 假设 evidence_img_url 为相对路径，如 /uploads/temp/images/xxx.png
           const destRelative = `/schools/${schoolId}/private/evidence_img.png`;
           try {
-            this.storageService.moveFile(application.evidence_img_url, destRelative);
+            this.storageService.moveFile(
+              application.evidence_img_url,
+              destRelative,
+            );
             // 3. 修正 evidence_img_url 的值为新相对地址
             savedSchool.evidence_img_url = destRelative;
             await schoolRepo.save(savedSchool);
             application.evidence_img_url = destRelative;
           } catch (error) {
-            this.logger.error(`Failed to move evidence image: ${error.message}`);
+            this.logger.error(
+              `Failed to move evidence image: ${error.message}`,
+            );
             // 迁移失败不中断整个审批流程，但记录日志
           }
         }
@@ -166,7 +180,8 @@ export class SchoolService {
 
         application.status = SchoolApplicationStatusMap.APPROVED;
         application.review_remark = reviewDto.review_remark;
-        application.reviewed_by = reviewedBy !== null ? String(reviewedBy) : undefined;
+        application.reviewed_by =
+          reviewedBy !== null ? String(reviewedBy) : undefined;
         application.reject_reason = undefined;
         const updatedApplication = await appRepo.save(application);
 
@@ -180,7 +195,8 @@ export class SchoolService {
       if (reviewDto.action === SchoolApplicationReviewActionMap.REJECT) {
         application.status = SchoolApplicationStatusMap.REJECTED;
         application.review_remark = reviewDto.review_remark || '审核未通过';
-        application.reviewed_by = reviewedBy !== null ? String(reviewedBy) : undefined;
+        application.reviewed_by =
+          reviewedBy !== null ? String(reviewedBy) : undefined;
         application.reject_reason =
           reviewDto.reject_reason !== undefined
             ? String(reviewDto.reject_reason)
@@ -200,12 +216,19 @@ export class SchoolService {
 
   private generateRandomLetters(length: number): string {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    return Array.from(
+      { length },
+      () => chars[Math.floor(Math.random() * chars.length)],
+    ).join('');
   }
 
   private generateRandomPassword(length: number): string {
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const chars =
+      'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    return Array.from(
+      { length },
+      () => chars[Math.floor(Math.random() * chars.length)],
+    ).join('');
   }
 
   private async generateUniqueAccount(
@@ -227,8 +250,18 @@ export class SchoolService {
     return await this.schoolRepository.save(school);
   }
 
-  async findAll(query: QuerySchoolDto): Promise<{ list: School[]; total: number }> {
-    const { page = 1, pageSize = 10, id, name, charge_name, charge_phone, status } = query;
+  async findAll(
+    query: QuerySchoolDto,
+  ): Promise<{ list: School[]; total: number }> {
+    const {
+      page = 1,
+      pageSize = 10,
+      id,
+      name,
+      charge_name,
+      charge_phone,
+      status,
+    } = query;
 
     const where: any = {};
     if (id) where.id = id;
@@ -256,7 +289,9 @@ export class SchoolService {
   }
 
   async update(id: string, updateSchoolDto: UpdateSchoolDto): Promise<School> {
-    (updateSchoolDto as any).update_time = String(Math.floor(Date.now() / 1000));
+    (updateSchoolDto as any).update_time = String(
+      Math.floor(Date.now() / 1000),
+    );
     const result = await this.schoolRepository.update(id, updateSchoolDto);
     if (result.affected === 0) {
       throw new NotFoundException('学校不存在');

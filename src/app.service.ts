@@ -3,7 +3,7 @@ import Redis from 'ioredis';
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 @Injectable()
 export class AppService {
-  constructor(@Inject('REDIS_CLIENT') private readonly redis: Redis) { }
+  constructor(@Inject('REDIS_CLIENT') private readonly redis: Redis) {}
   getHello(): string {
     return 'Hello World!2';
   }
@@ -12,8 +12,7 @@ export class AppService {
     this.redis.set('test', '123', 'EX', 2);
     await sleep(5000);
     const value = await this.redis.get('test');
-    console.log(value)
+    console.log(value);
     return value;
   }
-
 }

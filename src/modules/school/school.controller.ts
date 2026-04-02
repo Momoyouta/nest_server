@@ -25,10 +25,9 @@ import { QuerySchoolApplicationDto } from './dto/QuerySchoolApplicationDto.dto';
 import { ReviewSchoolApplicationDto } from './dto/ReviewSchoolApplicationDto.dto';
 
 @ApiTags('学校管理')
-
 @Controller('school')
 export class SchoolController {
-  constructor(private readonly schoolService: SchoolService) { }
+  constructor(private readonly schoolService: SchoolService) {}
 
   @Post('create')
   @AdminAuth()
@@ -68,7 +67,10 @@ export class SchoolController {
     @Param('id') id: string,
     @Body() reviewDto: ReviewSchoolApplicationDto,
   ) {
-    const application = await this.schoolService.reviewApplication(id, reviewDto);
+    const application = await this.schoolService.reviewApplication(
+      id,
+      reviewDto,
+    );
     return Result.success('审批成功', application);
   }
 

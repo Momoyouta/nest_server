@@ -4,7 +4,9 @@ export const SchoolApplicationStatusMap = {
   REJECTED: 2,
 };
 
-export const SchoolApplicationStatusValues = Object.values(SchoolApplicationStatusMap);
+export const SchoolApplicationStatusValues = Object.values(
+  SchoolApplicationStatusMap,
+);
 
 export const SchoolApplicationReviewActionMap = {
   APPROVE: 'approve',

@@ -5,6 +5,7 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   MaxLength,
@@ -12,6 +13,10 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { CourseStatusMap, CourseStatusValues } from '@/common/utils/course.map';
+import {
+  CourseOutlineSourceMap,
+  CourseOutlineSourceValues,
+} from '@/common/utils/course-outline.map';
 
 export class CreateCourseDto {
   @ApiProperty({ description: '课程名称', example: '高等数学一' })
@@ -153,6 +158,19 @@ export class CourseListQueryDto {
   school_id?: string;
 }
 
+export class CourseLessonOutlineQueryDto {
+  @ApiPropertyOptional({
+    description:
+      '返回数据源，仅 admin 平台生效：draft=优先草稿，published=已发布内容',
+    enum: CourseOutlineSourceValues,
+    example: CourseOutlineSourceMap.DRAFT,
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(CourseOutlineSourceValues)
+  source?: string;
+}
+
 export class CourseListItemDto {
   @ApiProperty({ description: '课程ID' })
   id: string;
@@ -208,6 +226,221 @@ export class CourseListResponseDto {
   total: number;
 }
 
+export class CourseOutlineLessonDto {
+  @ApiProperty({ description: '课时ID', example: '301' })
+  @IsString()
+  @IsNotEmpty()
+  lesson_id: string;
+
+  @ApiProperty({ description: '课时标题', example: '1.1 Vite 核心原理解析' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  title: string;
+
+  @ApiPropertyOptional({
+    description: '课时描述',
+    example: '本节课主要讲解 Vite 的双引擎架构...',
+  })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({
+    description: '资源ID，可为空',
+    example: 'res_88291',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  resource_id?: string | null;
+
+  @ApiProperty({ description: '排序值', example: 1 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  sort_order: number;
+
+  @ApiProperty({ description: '课时时长（秒）', example: 1250 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  duration: number;
+}
+
+export class CourseOutlineChapterDto {
+  @ApiProperty({ description: '章节ID', example: '201' })
+  @IsString()
+  @IsNotEmpty()
+  chapter_id: string;
+
+  @ApiProperty({ description: '章节标题', example: '第一章：前端工程化基础' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  title: string;
+
+  @ApiProperty({ description: '排序值', example: 1 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  sort_order: number;
+
+  @ApiProperty({ type: [CourseOutlineLessonDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CourseOutlineLessonDto)
+  lessons: CourseOutlineLessonDto[];
+}
+
+export class CourseOutlineDraftDto {
+  @ApiProperty({ description: '课程ID', example: '1001' })
+  @IsString()
+  @IsNotEmpty()
+  course_id: string;
+
+  @ApiProperty({ description: '学校ID', example: 'sch_001' })
+  @IsString()
+  @IsNotEmpty()
+  school_id: string;
+
+  @ApiProperty({
+    description: '课程状态: 0-未发布, 1-已发布',
+    enum: CourseStatusValues,
+    example: CourseStatusMap.PUBLISHED,
+  })
+  @Type(() => Number)
+  @IsInt()
+  @IsIn(CourseStatusValues)
+  status: number;
+
+  @ApiProperty({ type: [CourseOutlineChapterDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CourseOutlineChapterDto)
+  chapters: CourseOutlineChapterDto[];
+}
+
+export class SaveCourseDraftDto {
+  @ApiProperty({ description: '课程ID', example: '1001' })
+  @IsString()
+  @IsNotEmpty()
+  course_id: string;
+
+  @ApiProperty({
+    description: '课程大纲草稿 JSON',
+    type: CourseOutlineDraftDto,
+    example: {
+      course_id: '1001',
+      school_id: 'sch_001',
+      status: 1,
+      chapters: [
+        {
+          chapter_id: '201',
+          title: '第一章：前端工程化基础',
+          sort_order: 1,
+          lessons: [
+            {
+              lesson_id: 'temp_uuid_a1b2',
+              title: '1.2 React 19 新特性',
+              description: '',
+              sort_order: 2,
+              resource_id: null,
+              duration: 0,
+            },
+          ],
+        },
+      ],
+    },
+  })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => CourseOutlineDraftDto)
+  draft_content: CourseOutlineDraftDto;
+}
+
+export class PublishCourseOutlineDto extends SaveCourseDraftDto {}
+
+export class ChapterQuickUpdateDto {
+  @ApiProperty({ description: '章节ID', example: '201' })
+  @IsString()
+  @IsNotEmpty()
+  chapter_id: string;
+
+  @ApiProperty({
+    description: '章节标题',
+    example: '第一章：前端工程化基础（修订）',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  title: string;
+}
+
+export class QuickUpdateChapterTitleDto extends SaveCourseDraftDto {
+  @ApiProperty({ type: ChapterQuickUpdateDto })
+  @ValidateNested()
+  @Type(() => ChapterQuickUpdateDto)
+  chapter: ChapterQuickUpdateDto;
+}
+
+export class LessonQuickUpdateDto {
+  @ApiProperty({ description: '课时ID', example: '301' })
+  @IsString()
+  @IsNotEmpty()
+  lesson_id: string;
+
+  @ApiProperty({ description: '章节ID', example: '201' })
+  @IsString()
+  @IsNotEmpty()
+  chapter_id: string;
+
+  @ApiProperty({
+    description: '课时标题',
+    example: '1.1 Vite 核心原理解析（修订）',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  title: string;
+
+  @ApiPropertyOptional({
+    description: '课时描述',
+    example: '深入讲解 Vite 的双引擎机制',
+  })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({
+    description: '资源ID，可为空',
+    example: 'res_99302',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  resource_id?: string | null;
+
+  @ApiProperty({ description: '课时时长（秒）', example: 3400 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  duration: number;
+
+  @ApiProperty({ description: '排序值', example: 1 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  sort_order: number;
+}
+
+export class QuickUpdateLessonDto extends SaveCourseDraftDto {
+  @ApiProperty({ type: LessonQuickUpdateDto })
+  @ValidateNested()
+  @Type(() => LessonQuickUpdateDto)
+  lesson: LessonQuickUpdateDto;
+}
+
 export class CourseBasicResponseDto {
   @ApiProperty({ description: '课程ID' })
   id: string;
@@ -254,6 +487,69 @@ export class CourseBasicResponseDto {
 export class CreateCourseResponseDto {
   @ApiProperty({ description: '课程ID' })
   id: string;
+}
+
+export class SaveCourseDraftResponseDto {
+  @ApiProperty({ description: '课程ID', example: '1001' })
+  course_id: string;
+
+  @ApiProperty({ description: '是否更新成功', example: true })
+  updated: true;
+}
+
+export class PublishIdMappingItemDto {
+  @ApiProperty({ description: '临时ID', example: 'temp_uuid_a1b2' })
+  temp_id: string;
+
+  @ApiProperty({ description: '真实ID', example: '301' })
+  real_id: string;
+}
+
+export class PublishIdMappingsDto {
+  @ApiProperty({ type: [PublishIdMappingItemDto] })
+  chapters: PublishIdMappingItemDto[];
+
+  @ApiProperty({ type: [PublishIdMappingItemDto] })
+  lessons: PublishIdMappingItemDto[];
+}
+
+export class PublishCourseOutlineResponseDto {
+  @ApiProperty({ description: '课程ID', example: '1001' })
+  course_id: string;
+
+  @ApiProperty({ description: '是否发布成功', example: true })
+  published: true;
+
+  @ApiProperty({ description: '章节数量', example: 2 })
+  chapter_count: number;
+
+  @ApiProperty({ description: '课时数量', example: 3 })
+  lesson_count: number;
+
+  @ApiProperty({ type: PublishIdMappingsDto })
+  id_mappings: PublishIdMappingsDto;
+}
+
+export class QuickUpdateChapterTitleResponseDto {
+  @ApiProperty({ description: '课程ID', example: '1001' })
+  course_id: string;
+
+  @ApiProperty({ description: '章节ID', example: '201' })
+  chapter_id: string;
+
+  @ApiProperty({ description: '是否更新成功', example: true })
+  updated: true;
+}
+
+export class QuickUpdateLessonResponseDto {
+  @ApiProperty({ description: '课程ID', example: '1001' })
+  course_id: string;
+
+  @ApiProperty({ description: '课时ID', example: '301' })
+  lesson_id: string;
+
+  @ApiProperty({ description: '是否更新成功', example: true })
+  updated: true;
 }
 
 export class UpdateCourseResponseDto {

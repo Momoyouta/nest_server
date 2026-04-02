@@ -1,6 +1,6 @@
 import { Redis } from 'ioredis';
 import * as crypto from 'crypto';
-const prefix = 'invite:'
+const prefix = 'invite:';
 /**
  * 生成16位随机邀请码（字母+数字）
  * 使用 crypto 确保更高的随机性和唯一性
@@ -8,7 +8,8 @@ const prefix = 'invite:'
  * @returns 随机字符串
  */
 export function generateInviteCode(length: number = 16): string {
-  return crypto.randomBytes(Math.ceil(length / 2))
+  return crypto
+    .randomBytes(Math.ceil(length / 2))
     .toString('hex')
     .slice(0, length);
 }

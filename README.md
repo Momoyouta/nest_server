@@ -55,10 +55,10 @@ src/
 │       ├── avatars\                 # 学校特有标识/默认头像
 │       ├── resource_library\        # 🚀 核心变更：统一的校本资源库
 │       │   ├── videos\              # 所有教学视频统统放在这里（管理员离线导入 / 教师单文件上传）
-│       │   │   ├── {file_hash}.mp4  
+│       │   │   ├── {file_hash}.mp4  # 采用hash命名+目录分级
 │       │   │   └── bulk_import_temp\# 管理员批量上传的临时中转区
 │       │   ├── documents\           # 公共资料
-│       │   │   └── {file_hash}.*
+│       │   │   └── {file_hash}.*    # 采用hash命名+目录分级
 │       │   └── images\              # 图片资源
 |       ├── private\                 # 私有文件（证明等
 │       └── courses\                 # 课程数据

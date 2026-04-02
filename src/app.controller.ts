@@ -9,7 +9,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 @ApiTags('通用')
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) { }
+  constructor(private readonly appService: AppService) {}
 
   @Get('hello')
   @Public()
@@ -23,7 +23,6 @@ export class AppController {
   @Public()
   @ApiOperation({ summary: ' test 接口' })
   async getTest(): Promise<Result> {
-
     return Result.success('success', await this.appService.getTest());
   }
 }

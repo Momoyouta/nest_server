@@ -21,12 +21,22 @@ import { Role } from '@/common/decorators/role.decorator';
 import { AdminRoles } from '@/common/utils/role.map';
 import { Result } from '@/database/types/result.type';
 import {
+  CourseOutlineDraftDto,
   CourseDeleteParamDto,
+  CourseLessonOutlineQueryDto,
   CourseListQueryDto,
   CourseListResponseDto,
   CreateCourseDto,
   CreateCourseResponseDto,
   DeleteCourseResponseDto,
+  PublishCourseOutlineDto,
+  PublishCourseOutlineResponseDto,
+  QuickUpdateChapterTitleDto,
+  QuickUpdateChapterTitleResponseDto,
+  QuickUpdateLessonDto,
+  QuickUpdateLessonResponseDto,
+  SaveCourseDraftDto,
+  SaveCourseDraftResponseDto,
   UpdateCourseDto,
   UpdateCourseCoverDto,
   UpdateCourseResponseDto,
@@ -69,6 +79,110 @@ export class CourseController {
   async updateCourseAdmin(@Body() payload: UpdateCourseDto) {
     const data = await this.courseService.updateCourseAdmin(payload);
     return Result.success('更新成功', data);
+  }
+
+  @Post('saveCourseDraftAdmin')
+  @AdminAuth()
+  @Role(...AdminRoles)
+  @ApiOperation({ summary: '保存课程大纲草稿（仅覆盖 draft_content）' })
+  @ApiBody({ type: SaveCourseDraftDto })
+  @ApiResponse({
+    status: 200,
+    description: '保存成功',
+    type: SaveCourseDraftResponseDto,
+  })
+  async saveCourseDraftAdmin(@Body() payload: SaveCourseDraftDto) {
+    const data = await this.courseService.saveCourseDraftAdmin(payload);
+    return Result.success('保存成功', data);
+  }
+
+  @Post('publishCourseOutlineAdmin')
+  @AdminAuth()
+  @Role(...AdminRoles)
+  @ApiOperation({
+    summary: '发布课程大纲（覆盖草稿并按 diff 同步章节课时）',
+  })
+  @ApiBody({ type: PublishCourseOutlineDto })
+  @ApiResponse({
+    status: 200,
+    description: '发布成功',
+    type: PublishCourseOutlineResponseDto,
+  })
+  async publishCourseOutlineAdmin(@Body() payload: PublishCourseOutlineDto) {
+    const data = await this.courseService.publishCourseOutlineAdmin(payload);
+    return Result.success('发布成功', data);
+  }
+
+  @Put('updateChapterTitleQuickAdmin')
+  @AdminAuth()
+  @Role(...AdminRoles)
+  @ApiOperation({ summary: '快捷更新章节标题（覆盖草稿并更新章节表）' })
+  @ApiBody({ type: QuickUpdateChapterTitleDto })
+  @ApiResponse({
+    status: 200,
+    description: '更新成功',
+    type: QuickUpdateChapterTitleResponseDto,
+  })
+  async updateChapterTitleQuickAdmin(
+    @Body() payload: QuickUpdateChapterTitleDto,
+  ) {
+    const data = await this.courseService.updateChapterTitleQuickAdmin(payload);
+    return Result.success('更新成功', data);
+  }
+
+  @Put('updateLessonQuickAdmin')
+  @AdminAuth()
+  @Role(...AdminRoles)
+  @ApiOperation({ summary: '快捷更新课时（覆盖草稿并更新课时表）' })
+  @ApiBody({ type: QuickUpdateLessonDto })
+  @ApiResponse({
+    status: 200,
+    description: '更新成功',
+    type: QuickUpdateLessonResponseDto,
+  })
+  async updateLessonQuickAdmin(@Body() payload: QuickUpdateLessonDto) {
+    const data = await this.courseService.updateLessonQuickAdmin(payload);
+    return Result.success('更新成功', data);
+  }
+
+  @Get('getCourseLessonOutline/:id')
+  @AllJwtAuth()
+  @ApiOperation({
+    summary: '查询课程课时大纲（admin优先草稿，user查询发布态）',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '查询成功',
+    type: CourseOutlineDraftDto,
+  })
+  async getCourseLessonOutline(
+    @Param() params: CourseDeleteParamDto,
+    @Query() query: CourseLessonOutlineQueryDto,
+  ) {
+    const data = await this.courseService.getCourseLessonOutline(
+      params.id,
+      query.source,
+    );
+    return Result.success('查询成功', data);
+  }
+
+  @Get('importPublishedCourseLessonOutlineAdmin/:id')
+  @AdminAuth()
+  @Role(...AdminRoles)
+  @ApiOperation({ summary: '导入当前已发布内容大纲（管理端）' })
+  @ApiResponse({
+    status: 200,
+    description: '查询成功',
+    type: CourseOutlineDraftDto,
+  })
+  async importPublishedCourseLessonOutlineAdmin(
+    @Param() params: CourseDeleteParamDto,
+  ) {
+    const data =
+      await this.courseService.importPublishedCourseLessonOutlineAdmin(
+        params.id,
+      );
+    return Result.success('查询成功', data);
   }
 
   @Put('updateCourseCoverAdmin')

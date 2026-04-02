@@ -1,6 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { BinaryFlagMap, BinaryFlagValues } from '@/common/utils/course.map';
-import { BeforeInsert, BeforeUpdate, Column, Entity, PrimaryColumn } from 'typeorm';
+import {
+  BeforeInsert,
+  BeforeUpdate,
+  Column,
+  Entity,
+  PrimaryColumn,
+} from 'typeorm';
 import { v4 } from 'uuid';
 
 @Entity('assignment_answer_detail')
@@ -22,7 +28,11 @@ export class AssignmentAnswerDetail {
   student_id: string;
 
   @Column({ type: 'json', nullable: true })
-  @ApiProperty({ description: '学生答案(JSON)', required: false, example: { value: 'A' } })
+  @ApiProperty({
+    description: '学生答案(JSON)',
+    required: false,
+    example: { value: 'A' },
+  })
   student_answer?: Record<string, any> | Array<any>;
 
   @Column({ type: 'tinyint', nullable: true, default: BinaryFlagMap.NO })
@@ -34,7 +44,13 @@ export class AssignmentAnswerDetail {
   })
   is_correct?: number;
 
-  @Column({ type: 'decimal', precision: 5, scale: 1, nullable: true, default: 0.0 })
+  @Column({
+    type: 'decimal',
+    precision: 5,
+    scale: 1,
+    nullable: true,
+    default: 0.0,
+  })
   @ApiProperty({ description: '得分', required: false, example: '5.0' })
   score?: string;
 

@@ -12,7 +12,10 @@ import { FileChunk } from './chunk.entity';
 import { InitChunkDto } from './dto/init-chunk.dto';
 import { UploadChunkDto } from './dto/upload-chunk.dto';
 import { MergeChunkDto } from './dto/merge-chunk.dto';
-import { FilePathTemplate, getFileStoreRoot } from '@/common/utils/file-path.map';
+import {
+  FilePathTemplate,
+  getFileStoreRoot,
+} from '@/common/utils/file-path.map';
 import { UploadService } from '../upload/upload.service';
 
 @Injectable()
@@ -35,7 +38,10 @@ export class ChunkService {
       where: { fileHash },
     });
 
-    if (existing && (existing.status === 'pending' || existing.status === 'merging')) {
+    if (
+      existing &&
+      (existing.status === 'pending' || existing.status === 'merging')
+    ) {
       return {
         uploadId: existing.id,
         fileHash: existing.fileHash,
@@ -74,7 +80,14 @@ export class ChunkService {
     fs.mkdirSync(chunkDir, { recursive: true });
 
     // 写入 metadata.json
-    const metadata = { uploadId, fileHash, fileName, fileSize, totalChunks, createdAt: now.toISOString() };
+    const metadata = {
+      uploadId,
+      fileHash,
+      fileName,
+      fileSize,
+      totalChunks,
+      createdAt: now.toISOString(),
+    };
     fs.writeFileSync(
       path.join(chunkDir, 'metadata.json'),
       JSON.stringify(metadata, null, 2),
@@ -87,10 +100,7 @@ export class ChunkService {
   /**
    * 上传单个分片
    */
-  async uploadChunk(
-    dto: UploadChunkDto,
-    file: Express.Multer.File,
-  ) {
+  async uploadChunk(dto: UploadChunkDto, file: Express.Multer.File) {
     const { uploadId, chunkIndex } = dto;
 
     const record = await this.chunkRepo.findOne({ where: { id: uploadId } });
@@ -157,7 +167,10 @@ export class ChunkService {
     }
 
     // 标记为 merging（防止并发重复合并）
-    await this.chunkRepo.update(uploadId, { status: 'merging', updateTime: new Date() });
+    await this.chunkRepo.update(uploadId, {
+      status: 'merging',
+      updateTime: new Date(),
+    });
 
     try {
       // 确保目标目录存在
@@ -193,10 +206,15 @@ export class ChunkService {
         updateTime: new Date(),
       });
 
-      return { filePath: `${targetPath}/${outputFileName}`.replace(/\\/g, '/') };
+      return {
+        filePath: `${targetPath}/${outputFileName}`.replace(/\\/g, '/'),
+      };
     } catch (error) {
       // 合并失败，回退状态
-      await this.chunkRepo.update(uploadId, { status: 'pending', updateTime: new Date() });
+      await this.chunkRepo.update(uploadId, {
+        status: 'pending',
+        updateTime: new Date(),
+      });
       throw error;
     }
   }

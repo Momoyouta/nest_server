@@ -1,7 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Redis } from 'ioredis';
-import { generateInviteCode, createInviteCode } from '@/common/utils/invite.util';
-import { CreateInviteDto, InvitationDataDto, InvitationQueryDto } from '@/common/dto/invite.dto';
+import {
+  generateInviteCode,
+  createInviteCode,
+} from '@/common/utils/invite.util';
+import {
+  CreateInviteDto,
+  InvitationDataDto,
+  InvitationQueryDto,
+} from '@/common/dto/invite.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { InvitationCode } from '@/database/entities/invitation_code.entity';
 import { Repository } from 'typeorm';
@@ -15,7 +22,7 @@ export class InvitationService {
     private readonly redis: Redis,
     @InjectRepository(InvitationCode)
     private readonly invitationRepository: Repository<InvitationCode>,
-  ) { }
+  ) {}
 
   /**
    * 创建邀请码并存储到数据库和 Redis
@@ -64,9 +71,19 @@ export class InvitationService {
    * 获取邀请码列表 (带分页和多条件过滤)
    */
   async findAll(query: InvitationQueryDto) {
-    const { page = 1, pageSize = 10, code, creater_id, school_id, class_id, grade, type } = query;
+    const {
+      page = 1,
+      pageSize = 10,
+      code,
+      creater_id,
+      school_id,
+      class_id,
+      grade,
+      type,
+    } = query;
 
-    const qb = this.invitationRepository.createQueryBuilder('ic')
+    const qb = this.invitationRepository
+      .createQueryBuilder('ic')
       .leftJoin(School, 's', 'ic.school_id = s.id')
       .leftJoin(User, 'u', 'ic.creater_id = u.id')
       .select([

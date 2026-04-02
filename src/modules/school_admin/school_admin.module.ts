@@ -11,4 +11,4 @@ import { UserModule } from '../user/user.module';
   controllers: [SchoolAdminController],
   providers: [SchoolAdminService],
 })
-export class SchoolAdminModule { }
+export class SchoolAdminModule {}

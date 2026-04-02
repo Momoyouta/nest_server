@@ -38,7 +38,10 @@ export class QuerySchoolDto {
   @IsString()
   charge_phone?: string;
 
-  @ApiProperty({ description: '状态 (0: 审核中, 1: 启用, 2: 禁用)', required: false })
+  @ApiProperty({
+    description: '状态 (0: 审核中, 1: 启用, 2: 禁用)',
+    required: false,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

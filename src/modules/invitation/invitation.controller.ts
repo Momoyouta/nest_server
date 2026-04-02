@@ -1,4 +1,12 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AdminAuth } from '@/common/decorators/admin-auth.decorator';
 import { InvitationService } from './invitation.service';
@@ -13,7 +21,7 @@ export class InvitationController {
   constructor(
     private readonly invitationService: InvitationService,
     private readonly alsService: AsyncLocalstorageService,
-  ) { }
+  ) {}
 
   @Post()
   @ApiOperation({ summary: '创建邀请码' })

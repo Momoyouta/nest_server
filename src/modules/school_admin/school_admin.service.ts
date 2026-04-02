@@ -13,10 +13,18 @@ export class SchoolAdminService {
     private schoolAdminRepository: Repository<SchoolAdmin>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
-  ) { }
+  ) {}
 
   async findAll(query: BaseQueryDto) {
-    const { page = 1, pageSize = 10, id, name, phone, school_id, status } = query as any;
+    const {
+      page = 1,
+      pageSize = 10,
+      id,
+      name,
+      phone,
+      school_id,
+      status,
+    } = query as any;
     const qb = this.schoolAdminRepository.createQueryBuilder('school_admin');
     qb.leftJoinAndSelect('school_admin.user', 'user');
     qb.where('user.role_id IN (:...roles) ', { roles: SchoolAdminRoles });
@@ -41,7 +49,7 @@ export class SchoolAdminService {
 
     const [items, total] = await qb.getManyAndCount();
 
-    const flatItems = items.map(item => {
+    const flatItems = items.map((item) => {
       const { user, id: school_admin_id, ...rest } = item as any;
       if (user) {
         return { school_admin_id, ...rest, ...user };
@@ -65,7 +73,10 @@ export class SchoolAdminService {
     const { account, name, password, phone, role_id, sex, schoolId } = data;
 
     // 1. 创建 User
-    const hashedPassword = await bcrypt.hash(String(password), await bcrypt.genSalt(10));
+    const hashedPassword = await bcrypt.hash(
+      String(password),
+      await bcrypt.genSalt(10),
+    );
     const user = this.userRepository.create({
       account,
       name,
@@ -91,17 +102,35 @@ export class SchoolAdminService {
     const admin = await this.findOne(userId);
     if (data.user) {
       if (data.user.password) {
-        data.user.password = await bcrypt.hash(String(data.user.password), await bcrypt.genSalt(10));
+        data.user.password = await bcrypt.hash(
+          String(data.user.password),
+          await bcrypt.genSalt(10),
+        );
       }
       data.user.update_time = String(Math.floor(Date.now() / 1000));
       await this.userRepository.update(admin.user_id, data.user);
-      await this.schoolAdminRepository.update(admin.id, data.admin || data.school_admin || data);
+      await this.schoolAdminRepository.update(
+        admin.id,
+        data.admin || data.school_admin || data,
+      );
     } else {
-      const userFields = this.userRepository.metadata.columns.map(c => c.propertyName);
+      const userFields = this.userRepository.metadata.columns.map(
+        (c) => c.propertyName,
+      );
       const userData: any = {};
       const adminData: any = {};
 
-      const excludeFields = ['id', 'user_id', 'organization', 'roleNames', 'school_admin_id', 'institution', 'create_time', 'update_time', 'user'];
+      const excludeFields = [
+        'id',
+        'user_id',
+        'organization',
+        'roleNames',
+        'school_admin_id',
+        'institution',
+        'create_time',
+        'update_time',
+        'user',
+      ];
 
       const now = String(Math.floor(Date.now() / 1000));
       for (const ObjectKey of Object.keys(data)) {
@@ -110,7 +139,10 @@ export class SchoolAdminService {
 
         if (userFields.includes(key)) {
           if (key === 'password' && data[key]) {
-            userData[key] = await bcrypt.hash(String(data[key]), await bcrypt.genSalt(10));
+            userData[key] = await bcrypt.hash(
+              String(data[key]),
+              await bcrypt.genSalt(10),
+            );
           } else {
             userData[key] = data[key];
           }
