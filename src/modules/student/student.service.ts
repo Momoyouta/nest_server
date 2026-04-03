@@ -46,75 +46,10 @@ export class StudentService {
       throw new ForbiddenException('未登录');
     }
 
-    const student = await this.studentRepository.findOne({
-      where: { user_id: userId },
-    });
-    if (!student) {
-      throw new NotFoundException('学生不存在');
-    }
-
-    const inviteData = await this.invitationService.getInviteDataPreferRedis(
+    return await this.invitationService.joinCourseByInviteCode(
+      userId,
       payload.code,
     );
-    if (!inviteData) {
-      throw new BadRequestException('邀请码不存在或已过期');
-    }
-    if (
-      Number(inviteData.type) !== Number(InvitationTypeMap.STUDENT_JOIN_COURSE)
-    ) {
-      throw new BadRequestException('邀请码类型不匹配');
-    }
-    if (!inviteData.course_id || !inviteData.teaching_group_id) {
-      throw new BadRequestException('课程邀请码数据缺失');
-    }
-
-    if (
-      student.school_id &&
-      inviteData.school_id &&
-      String(student.school_id) !== String(inviteData.school_id)
-    ) {
-      throw new BadRequestException('邀请码所属学校与学生不匹配');
-    }
-
-    const course = await this.courseRepository.findOne({
-      where: { id: inviteData.course_id },
-    });
-    if (!course) {
-      throw new NotFoundException('课程不存在');
-    }
-
-    const teachingGroup = await this.courseTeachingGroupRepository.findOne({
-      where: {
-        id: inviteData.teaching_group_id,
-        course_id: course.id,
-      },
-    });
-    if (!teachingGroup) {
-      throw new NotFoundException('教学组不存在');
-    }
-
-    const existing = await this.courseStudentRepository.findOne({
-      where: {
-        course_id: course.id,
-        student_id: student.id,
-      },
-    });
-    if (existing) {
-      throw new BadRequestException('已加入该课程');
-    }
-
-    const relation = this.courseStudentRepository.create({
-      course_id: course.id,
-      student_id: student.id,
-      group_id: teachingGroup.id,
-    });
-    await this.courseStudentRepository.save(relation);
-
-    return {
-      course_id: course.id,
-      teaching_group_id: teachingGroup.id,
-      joined: true,
-    };
   }
 
   async findAll(query: BaseQueryDto) {

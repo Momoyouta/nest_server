@@ -34,14 +34,14 @@ export class CurrentUserInfoDto {
 }
 
 export class CurrentTeacherInfoDto {
+  @ApiProperty({ description: '教师ID' })
+  teacher_id: string;
+
   @ApiPropertyOptional({ description: '工号' })
   teacher_number?: string;
 
   @ApiPropertyOptional({ description: '学院' })
   college?: string;
-
-  @ApiProperty({ description: '所属用户ID' })
-  user_id: string;
 
   @ApiPropertyOptional({ description: '学校ID' })
   school_id?: string;
@@ -51,6 +51,9 @@ export class CurrentTeacherInfoDto {
 }
 
 export class CurrentStudentInfoDto {
+  @ApiProperty({ description: '学生ID' })
+  student_id: string;
+
   @ApiPropertyOptional({ description: '学号' })
   student_number?: string;
 
@@ -59,9 +62,6 @@ export class CurrentStudentInfoDto {
 
   @ApiPropertyOptional({ description: '学院' })
   college?: string;
-
-  @ApiProperty({ description: '所属用户ID' })
-  user_id: string;
 
   @ApiPropertyOptional({ description: '学校ID' })
   school_id?: string;

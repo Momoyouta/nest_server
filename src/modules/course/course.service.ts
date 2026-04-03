@@ -53,6 +53,9 @@ import {
   SaveCourseDraftResponseDto,
   UpdateCourseCoverDto,
   UpdateCourseDto,
+  ListTeacherCoursesQueryDto,
+  ListStudentCoursesQueryDto,
+  CourseUserListResponseDto,
 } from '@/modules/course/dto/CourseAdmin.dto';
 import { CourseStatusMap } from '@/common/utils/course.map';
 import { PlatformAdminRoles, SchoolAdminRoles } from '@/common/utils/role.map';
@@ -1102,6 +1105,135 @@ export class CourseService {
         creator_name: creatorNameMap.get(String(row.creator_id)),
       };
     });
+
+    return { list, total };
+  }
+
+  async listTeacherCoursesUser(
+    query: ListTeacherCoursesQueryDto,
+  ): Promise<CourseUserListResponseDto> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 10;
+
+    const baseQb = this.courseGroupTeacherRepository
+      .createQueryBuilder('cgt')
+      .innerJoin(CourseTeachingGroup, 'ctg', 'ctg.id = cgt.group_id')
+      .innerJoin(Course, 'course', 'course.id = ctg.course_id')
+      .innerJoin(School, 'school', 'school.id = course.school_id')
+      .select([
+        'course.id AS course_id',
+        'course.school_id AS school_id',
+        'course.creator_id AS creator_id',
+        'course.name AS name',
+        'course.cover_img AS cover_img',
+        'course.status AS status',
+        'course.create_time AS create_time',
+        'course.update_time AS update_time',
+        'school.name AS school_name',
+        'cgt.group_id AS group_id',
+      ])
+      .where('cgt.teacher_id = :teacherId', { teacherId: query.teacher_id });
+
+    if (query.school_id) {
+      baseQb.andWhere('course.school_id = :schoolId', {
+        schoolId: query.school_id,
+      });
+    }
+
+    const total = await baseQb.getCount();
+    const rows = await baseQb
+      .orderBy('course.create_time', 'DESC')
+      .offset((page - 1) * pageSize)
+      .limit(pageSize)
+      .getRawMany<any>();
+
+    if (rows.length === 0) {
+      return { list: [], total };
+    }
+
+    const groupIds = rows.map((row) => row.group_id);
+    const teacherNamesMap = await this.getTeachingGroupTeacherNamesMap(groupIds);
+
+    const list = rows.map((row) => ({
+      course_id: String(row.course_id),
+      school_id: String(row.school_id),
+      creator_id: String(row.creator_id),
+      name: String(row.name),
+      cover_img: row.cover_img ? String(row.cover_img) : undefined,
+      status: Number(row.status),
+      create_time: row.create_time ? String(row.create_time) : undefined,
+      update_time: row.update_time ? String(row.update_time) : undefined,
+      school_name: String(row.school_name || ''),
+      group_id: String(row.group_id),
+      teacher_names: teacherNamesMap.get(row.group_id) || [],
+    }));
+
+    return { list, total };
+  }
+
+  async listStudentCoursesUser(
+    query: ListStudentCoursesQueryDto,
+  ): Promise<CourseUserListResponseDto> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 10;
+
+    const baseQb = this.courseStudentRepository
+      .createQueryBuilder('cs')
+      .innerJoin(Course, 'course', 'course.id = cs.course_id')
+      .innerJoin(School, 'school', 'school.id = course.school_id')
+      .select([
+        'course.id AS course_id',
+        'course.school_id AS school_id',
+        'course.creator_id AS creator_id',
+        'course.name AS name',
+        'course.cover_img AS cover_img',
+        'course.status AS status',
+        'course.create_time AS create_time',
+        'course.update_time AS update_time',
+        'school.name AS school_name',
+        'cs.group_id AS group_id',
+      ])
+      .where('cs.student_id = :studentId', { studentId: query.student_id });
+
+    if (query.school_id) {
+      baseQb.andWhere('course.school_id = :schoolId', {
+        schoolId: query.school_id,
+      });
+    }
+
+    const total = await baseQb.getCount();
+    const rows = await baseQb
+      .orderBy('course.create_time', 'DESC')
+      .offset((page - 1) * pageSize)
+      .limit(pageSize)
+      .getRawMany<any>();
+
+    if (rows.length === 0) {
+      return { list: [], total };
+    }
+
+    const groupIds = rows
+      .map((row) => row.group_id)
+      .filter((id) => Boolean(id));
+
+    const teacherNamesMap =
+      groupIds.length > 0
+        ? await this.getTeachingGroupTeacherNamesMap(groupIds)
+        : new Map<string, string[]>();
+
+    const list = rows.map((row) => ({
+      course_id: String(row.course_id),
+      school_id: String(row.school_id),
+      creator_id: String(row.creator_id),
+      name: String(row.name),
+      cover_img: row.cover_img ? String(row.cover_img) : undefined,
+      status: Number(row.status),
+      create_time: row.create_time ? String(row.create_time) : undefined,
+      update_time: row.update_time ? String(row.update_time) : undefined,
+      school_name: String(row.school_name || ''),
+      group_id: String(row.group_id || ''),
+      teacher_names: row.group_id ? teacherNamesMap.get(row.group_id) || [] : [],
+    }));
 
     return { list, total };
   }

@@ -18,6 +18,10 @@ import {
   InvitationDataDto,
   InvitationQueryDto,
 } from '@/common/dto/invite.dto';
+import {
+  JoinCourseByInviteCodeDto,
+  JoinCourseByInviteCodeResponseDto,
+} from '@/modules/student/dto/join-course-by-invite.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { InvitationCode } from '@/database/entities/invitation_code.entity';
 import { Repository } from 'typeorm';
@@ -35,6 +39,8 @@ import {
   SchoolAdminRoles,
 } from '@/common/utils/role.map';
 import { InvitationTypeMap } from '@/common/utils/invite-type.map';
+import { Student } from '@/database/entities/student.entity';
+import { CourseStudent } from '@/database/entities/course_student.entity';
 
 @Injectable()
 export class InvitationService {
@@ -55,6 +61,10 @@ export class InvitationService {
     private readonly teacherRepository: Repository<Teacher>,
     @InjectRepository(SchoolAdmin)
     private readonly schoolAdminRepository: Repository<SchoolAdmin>,
+    @InjectRepository(Student)
+    private readonly studentRepository: Repository<Student>,
+    @InjectRepository(CourseStudent)
+    private readonly courseStudentRepository: Repository<CourseStudent>,
     private readonly alsService: AsyncLocalstorageService,
   ) {}
 
@@ -62,8 +72,20 @@ export class InvitationService {
    * 创建邀请码并存储到数据库和 Redis
    */
   async createInvite(dto: CreateInviteDto, creatorId: string): Promise<string> {
-    const code = generateInviteCode(16);
     const now = String(Math.floor(Date.now() / 1000));
+
+    const invitationData: InvitationDataDto = {
+      type: dto.type,
+      school_id: dto.school_id,
+      grade: dto.grade,
+      class_id: dto.class_id,
+      creater_id: creatorId,
+      create_time: now,
+      ttl: dto.ttl,
+    };
+
+    // 使用加密逻辑生成邀请码
+    const code = generateInviteCode(invitationData);
 
     // 1. 存储到数据库
     const invite = this.invitationRepository.create({
@@ -78,15 +100,7 @@ export class InvitationService {
     });
     await this.invitationRepository.save(invite);
 
-    // 2. 存储到 Redis (用于快速校验)
-    const invitationData: InvitationDataDto = {
-      type: dto.type,
-      school_id: dto.school_id,
-      grade: dto.grade,
-      class_id: dto.class_id,
-      creater_id: creatorId,
-      create_time: now,
-    };
+    // 2. 存储到 Redis (用于快速校验和撤回)
     await createInviteCode(this.redis, code, invitationData, dto.ttl);
 
     return code;
@@ -143,10 +157,22 @@ export class InvitationService {
       }
     }
 
-    const code = await this.generateUniqueInvitationCode();
     const nowSec = Math.floor(Date.now() / 1000);
     const now = String(nowSec);
     const ttlSec = dto.ttl ?? 0;
+
+    const invitationData: InvitationDataDto = {
+      type: Number(InvitationTypeMap.STUDENT_JOIN_COURSE),
+      school_id: course.school_id,
+      course_id: course.id,
+      teaching_group_id: teachingGroup.id,
+      creater_id: user.id,
+      create_time: now,
+      ttl: ttlSec,
+    };
+
+    // 使用加密逻辑生成邀请码
+    const code = generateInviteCode(invitationData);
 
     const invite = this.invitationRepository.create({
       code,
@@ -160,15 +186,6 @@ export class InvitationService {
     });
     await this.invitationRepository.save(invite);
 
-    const invitationData: InvitationDataDto = {
-      type: Number(InvitationTypeMap.STUDENT_JOIN_COURSE),
-      school_id: course.school_id,
-      course_id: course.id,
-      teaching_group_id: teachingGroup.id,
-      creater_id: user.id,
-      create_time: now,
-      ttl: ttlSec,
-    };
     await createInviteCode(
       this.redis,
       code,
@@ -184,6 +201,86 @@ export class InvitationService {
       createTime: now,
       ttl: ttlSec,
       expire_time: ttlSec > 0 ? String(nowSec + ttlSec) : null,
+    };
+  }
+
+  /**
+   * 学生通过邀请码加入课程
+   */
+  async joinCourseByInviteCode(
+    userId: string,
+    code: string,
+  ): Promise<JoinCourseByInviteCodeResponseDto> {
+    const student = await this.studentRepository.findOne({
+      where: { user_id: userId },
+    });
+    if (!student) {
+      throw new NotFoundException('学生不存在');
+    }
+
+    const inviteData = await this.getInviteDataPreferRedis(code);
+    if (!inviteData) {
+      throw new BadRequestException('邀请码不存在或已过期');
+    }
+
+    if (
+      Number(inviteData.type) !== Number(InvitationTypeMap.STUDENT_JOIN_COURSE)
+    ) {
+      throw new BadRequestException('邀请码类型不匹配');
+    }
+
+    if (!inviteData.course_id || !inviteData.teaching_group_id) {
+      throw new BadRequestException('课程邀请码数据缺失');
+    }
+
+    // 学校校验
+    if (
+      student.school_id &&
+      inviteData.school_id &&
+      String(student.school_id) !== String(inviteData.school_id)
+    ) {
+      throw new BadRequestException('邀请码所属学校与学生当前学校不匹配');
+    }
+
+    const course = await this.courseRepository.findOne({
+      where: { id: inviteData.course_id },
+    });
+    if (!course) {
+      throw new NotFoundException('课程不存在');
+    }
+
+    const teachingGroup = await this.courseTeachingGroupRepository.findOne({
+      where: {
+        id: inviteData.teaching_group_id,
+        course_id: course.id,
+      },
+    });
+    if (!teachingGroup) {
+      throw new NotFoundException('教学组不存在');
+    }
+
+    // 幂等校验
+    const existing = await this.courseStudentRepository.findOne({
+      where: {
+        course_id: course.id,
+        student_id: student.id,
+      },
+    });
+    if (existing) {
+      throw new BadRequestException('已加入该课程');
+    }
+
+    const relation = this.courseStudentRepository.create({
+      course_id: course.id,
+      student_id: student.id,
+      group_id: teachingGroup.id,
+    });
+    await this.courseStudentRepository.save(relation);
+
+    return {
+      course_id: course.id,
+      teaching_group_id: teachingGroup.id,
+      joined: true,
     };
   }
 
@@ -344,21 +441,6 @@ export class InvitationService {
       expiredDeletedCount: expiredInvites.length,
       orphanCacheDeletedCount,
     };
-  }
-
-  private async generateUniqueInvitationCode(): Promise<string> {
-    let attempts = 0;
-    while (attempts < 5) {
-      const code = generateInviteCode(16);
-      const exists = await this.invitationRepository.findOne({
-        where: { code },
-      });
-      if (!exists) {
-        return code;
-      }
-      attempts += 1;
-    }
-    throw new BadRequestException('生成邀请码失败，请重试');
   }
 
   private async getCurrentUserOrThrow(): Promise<User> {

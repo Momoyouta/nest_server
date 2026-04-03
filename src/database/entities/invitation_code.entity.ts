@@ -7,7 +7,7 @@ export class InvitationCode {
   @ApiProperty({ description: '主键ID' })
   id: number;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Column({ type: 'text', nullable: true })
   @ApiPropertyOptional({ description: '邀请码' })
   code: string;
 

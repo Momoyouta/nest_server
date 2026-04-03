@@ -449,6 +449,115 @@ export class CourseListResponseDto {
   total: number;
 }
 
+export class ListTeacherCoursesQueryDto {
+  @ApiPropertyOptional({ description: '页码', default: 1, example: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ description: '每页条数', default: 10, example: 10 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  pageSize?: number = 10;
+
+  @ApiProperty({ description: '老师ID', example: 'teacher-uuid' })
+  @IsString()
+  @IsNotEmpty()
+  teacher_id: string;
+
+  @ApiPropertyOptional({ description: '学校ID，可选', example: 'school-uuid' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  school_id?: string;
+}
+
+export class ListStudentCoursesQueryDto {
+  @ApiPropertyOptional({ description: '页码', default: 1, example: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ description: '每页条数', default: 10, example: 10 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  pageSize?: number = 10;
+
+  @ApiProperty({ description: '学生ID', example: 'student-uuid' })
+  @IsString()
+  @IsNotEmpty()
+  student_id: string;
+
+  @ApiPropertyOptional({ description: '学校ID，可选', example: 'school-uuid' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  school_id?: string;
+}
+
+export class CourseUserListItemDto {
+  @ApiProperty({ description: '课程ID' })
+  course_id: string;
+
+  @ApiProperty({ description: '学校ID' })
+  school_id: string;
+
+  @ApiProperty({ description: '创建人ID' })
+  creator_id: string;
+
+  @ApiProperty({ description: '课程名称' })
+  name: string;
+
+  @ApiPropertyOptional({ description: '封面图' })
+  cover_img?: string;
+
+  @ApiProperty({
+    description: '课程状态: 0-未发布, 1-已发布',
+    enum: CourseStatusValues,
+  })
+  status: number;
+
+  @ApiPropertyOptional({ description: '创建时间戳(s)' })
+  create_time?: string;
+
+  @ApiPropertyOptional({ description: '更新时间戳(s)' })
+  update_time?: string;
+
+  @ApiProperty({ description: '学校名称', example: '第一中学' })
+  school_name: string;
+
+  @ApiProperty({ description: '所在教学组ID', example: 'group-uuid' })
+  group_id: string;
+
+  @ApiProperty({
+    description: '对应教学组任课老师姓名列表',
+    type: [String],
+    example: ['张三', '李四'],
+  })
+  @IsArray()
+  teacher_names: string[];
+}
+
+export class CourseUserListResponseDto {
+  @ApiProperty({ type: [CourseUserListItemDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CourseUserListItemDto)
+  list: CourseUserListItemDto[];
+
+  @ApiProperty({ description: '总数', example: 100 })
+  @IsInt()
+  total: number;
+}
+
 export class CourseOutlineLessonDto {
   @ApiProperty({ description: '课时ID', example: '301' })
   @IsString()

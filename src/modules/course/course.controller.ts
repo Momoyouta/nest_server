@@ -50,9 +50,12 @@ import {
   TeachingGroupIdParamDto,
   UpdateTeachingGroupAdminDto,
   UpdateTeachingGroupAdminResponseDto,
-  UpdateCourseDto,
   UpdateCourseCoverDto,
   UpdateCourseResponseDto,
+  UpdateCourseDto,
+  ListTeacherCoursesQueryDto,
+  ListStudentCoursesQueryDto,
+  CourseUserListResponseDto,
 } from '@/modules/course/dto/CourseAdmin.dto';
 import { CourseService } from '@/modules/course/course.service';
 
@@ -60,7 +63,7 @@ import { CourseService } from '@/modules/course/course.service';
 @ApiBearerAuth('access_token')
 @Controller('course')
 export class CourseController {
-  constructor(private readonly courseService: CourseService) {}
+  constructor(private readonly courseService: CourseService) { }
 
   @Post('createCourseAdmin')
   @AdminAuth()
@@ -421,6 +424,30 @@ export class CourseController {
   })
   async getCourseDescription(@Param() params: CourseDeleteParamDto) {
     const data = await this.courseService.getCourseDescription(params.id);
+    return Result.success('查询成功', data);
+  }
+
+  @Get('listTeacherCoursesUser')
+  @ApiOperation({ summary: '用户端分页查询老师所教课程列表' })
+  @ApiResponse({
+    status: 200,
+    description: '查询成功',
+    type: CourseUserListResponseDto,
+  })
+  async listTeacherCoursesUser(@Query() query: ListTeacherCoursesQueryDto) {
+    const data = await this.courseService.listTeacherCoursesUser(query);
+    return Result.success('查询成功', data);
+  }
+
+  @Get('listStudentCoursesUser')
+  @ApiOperation({ summary: '用户端分页查询学生所学课程列表' })
+  @ApiResponse({
+    status: 200,
+    description: '查询成功',
+    type: CourseUserListResponseDto,
+  })
+  async listStudentCoursesUser(@Query() query: ListStudentCoursesQueryDto) {
+    const data = await this.courseService.listStudentCoursesUser(query);
     return Result.success('查询成功', data);
   }
 }

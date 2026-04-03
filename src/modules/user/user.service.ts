@@ -266,12 +266,10 @@ export class UserService {
               .getRepository(School)
               .findOneBy({ id: teacher.school_id })
           : null;
-        const teacherRest = { ...teacher } as CurrentTeacherInfoDto & {
-          id?: string;
-        };
-        delete teacherRest.id;
+        const { id: teacher_id, user_id, ...teacherRest } = teacher;
         teacherInfo = {
           ...teacherRest,
+          teacher_id,
           school_name: school?.name || '',
         };
         schoolName = school?.name || schoolName;
@@ -288,12 +286,10 @@ export class UserService {
               .getRepository(School)
               .findOneBy({ id: student.school_id })
           : null;
-        const studentRest = { ...student } as CurrentStudentInfoDto & {
-          id?: string;
-        };
-        delete studentRest.id;
+        const { id: student_id, user_id, ...studentRest } = student;
         studentInfo = {
           ...studentRest,
+          student_id,
           school_name: school?.name || '',
         };
         schoolName = school?.name || schoolName;
