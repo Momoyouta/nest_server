@@ -1,11 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsIn,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
   IsInt,
+  Min,
 } from 'class-validator';
+import {
+  InvitationTypeMap,
+  InvitationTypeValues,
+} from '@/common/utils/invite-type.map';
 
 export class InvitationDataDto {
   @ApiProperty({
@@ -30,6 +36,16 @@ export class InvitationDataDto {
   @IsOptional()
   class_id?: string;
 
+  @ApiPropertyOptional({ description: '课程ID' })
+  @IsString()
+  @IsOptional()
+  course_id?: string;
+
+  @ApiPropertyOptional({ description: '教学组ID' })
+  @IsString()
+  @IsOptional()
+  teaching_group_id?: string;
+
   @ApiProperty({ description: '创建者ID' })
   @IsString()
   @IsNotEmpty()
@@ -51,6 +67,7 @@ export class CreateInviteDto {
     description: '邀请码类型 (0:老师加入学校, 1:学生加入学校, 2:学生加入课程)',
   })
   @IsNumber()
+  @IsIn(InvitationTypeValues)
   @IsNotEmpty()
   type: number;
 
@@ -69,10 +86,73 @@ export class CreateInviteDto {
   @IsOptional()
   class_id?: string;
 
+  @ApiPropertyOptional({ description: '课程ID' })
+  @IsString()
+  @IsOptional()
+  course_id?: string;
+
+  @ApiPropertyOptional({ description: '教学组ID' })
+  @IsString()
+  @IsOptional()
+  teaching_group_id?: string;
+
   @ApiPropertyOptional({ description: '过期时间 (秒)' })
   @IsNumber()
+  @Min(1)
   @IsOptional()
-  ttl: number;
+  ttl?: number;
+}
+
+export class CreateCourseInviteDto {
+  @ApiPropertyOptional({
+    description: '学校ID，平台管理员场景可指定，教师场景可不传',
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  school_id?: string;
+
+  @ApiProperty({ description: '课程ID' })
+  @IsString()
+  @IsNotEmpty()
+  course_id: string;
+
+  @ApiProperty({ description: '教学组ID' })
+  @IsString()
+  @IsNotEmpty()
+  teaching_group_id: string;
+
+  @ApiPropertyOptional({ description: '邀请码有效时长(秒)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  ttl?: number;
+}
+
+export class CreateCourseInviteResponseDto {
+  @ApiProperty({ description: '邀请码' })
+  code: string;
+
+  @ApiProperty({
+    description: '邀请码类型',
+    example: InvitationTypeMap.STUDENT_JOIN_COURSE,
+  })
+  type: number;
+
+  @ApiProperty({ description: '课程ID' })
+  course_id: string;
+
+  @ApiProperty({ description: '教学组ID' })
+  teaching_group_id: string;
+
+  @ApiProperty({ description: '创建时间戳(s)' })
+  createTime: string;
+
+  @ApiPropertyOptional({ description: '邀请码有效时长(s)' })
+  ttl?: number | null;
+
+  @ApiPropertyOptional({ description: '失效时间戳(s)' })
+  expire_time?: string | null;
 }
 
 /**
@@ -98,6 +178,16 @@ export class InvitationQueryDto {
   @IsOptional()
   @IsString()
   class_id?: string;
+
+  @ApiPropertyOptional({ description: '课程ID' })
+  @IsOptional()
+  @IsString()
+  course_id?: string;
+
+  @ApiPropertyOptional({ description: '教学组ID' })
+  @IsOptional()
+  @IsString()
+  teaching_group_id?: string;
 
   @ApiPropertyOptional({ description: '年级' })
   @IsOptional()

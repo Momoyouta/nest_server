@@ -17,6 +17,8 @@ import { CourseChapter } from '@/database/entities/course_chapter.entity';
 import { CourseLesson } from '@/database/entities/course_lesson.entity';
 import { CourseTeacher } from '@/database/entities/course_teacher.entity';
 import { CourseStudent } from '@/database/entities/course_student.entity';
+import { CourseTeachingGroup } from '@/database/entities/course_teaching_group.entity';
+import { CourseGroupTeacher } from '@/database/entities/course_group_teacher.entity';
 import { CourseLearningRecord } from '@/database/entities/course_learning_record.entity';
 import { CourseAssignment } from '@/database/entities/course_assignment.entity';
 import { CourseAssignmentQuestion } from '@/database/entities/course_assignment_question.entity';
@@ -38,6 +40,8 @@ const entities = [
   CourseLesson,
   CourseTeacher,
   CourseStudent,
+  CourseTeachingGroup,
+  CourseGroupTeacher,
   CourseLearningRecord,
   CourseAssignment,
   CourseAssignmentQuestion,

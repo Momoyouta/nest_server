@@ -7,13 +7,11 @@ import {
   Body,
   Param,
   Query,
-  UseGuards,
-  Req,
   ForbiddenException,
 } from '@nestjs/common';
 import { StudentService } from '@/modules/student/student.service';
 import { BaseQueryDto } from '../../common/dto/base-query.dto';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Result } from '../../database/types/result.type';
 import { Role } from '../../common/decorators/role.decorator';
 import { AdminRoles, AdminRolesMap } from '../../common/utils/role.map';
@@ -21,6 +19,11 @@ import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorag
 import { UserService } from '../user/user.service';
 import * as _ from 'lodash';
 import { AdminAuth } from '@/common/decorators/admin-auth.decorator';
+import { AllJwtAuth } from '@/common/decorators/auth.decorator';
+import {
+  JoinCourseByInviteCodeDto,
+  JoinCourseByInviteCodeResponseDto,
+} from '@/modules/student/dto/join-course-by-invite.dto';
 
 @ApiTags('学生管理')
 @Controller('student')
@@ -75,5 +78,20 @@ export class StudentController {
   async remove(@Param('id') id: string) {
     await this.studentService.softDelete(id);
     return Result.success('禁用成功', null);
+  }
+
+  @Post('joinCourseByInviteCode')
+  @AllJwtAuth()
+  @Role(AdminRolesMap.student)
+  @ApiOperation({ summary: '学生通过邀请码加入课程' })
+  @ApiBody({ type: JoinCourseByInviteCodeDto })
+  @ApiResponse({
+    status: 200,
+    description: '加入成功',
+    type: JoinCourseByInviteCodeResponseDto,
+  })
+  async joinCourseByInviteCode(@Body() payload: JoinCourseByInviteCodeDto) {
+    const data = await this.studentService.joinCourseByInviteCode(payload);
+    return Result.success('加入成功', data);
   }
 }

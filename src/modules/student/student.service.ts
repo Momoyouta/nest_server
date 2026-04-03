@@ -1,10 +1,25 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import { Student } from '../../database/entities/student.entity';
 import { User } from '../../database/entities/user.entity';
 import { BaseQueryDto } from '../../common/dto/base-query.dto';
 import * as bcrypt from 'bcrypt';
+import { CourseStudent } from '@/database/entities/course_student.entity';
+import { CourseTeachingGroup } from '@/database/entities/course_teaching_group.entity';
+import { Course } from '@/database/entities/course.entity';
+import { InvitationService } from '@/modules/invitation/invitation.service';
+import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
+import { InvitationTypeMap } from '@/common/utils/invite-type.map';
+import {
+  JoinCourseByInviteCodeDto,
+  JoinCourseByInviteCodeResponseDto,
+} from '@/modules/student/dto/join-course-by-invite.dto';
 
 @Injectable()
 export class StudentService {
@@ -13,7 +28,94 @@ export class StudentService {
     private studentRepository: Repository<Student>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(CourseStudent)
+    private courseStudentRepository: Repository<CourseStudent>,
+    @InjectRepository(Course)
+    private courseRepository: Repository<Course>,
+    @InjectRepository(CourseTeachingGroup)
+    private courseTeachingGroupRepository: Repository<CourseTeachingGroup>,
+    private readonly invitationService: InvitationService,
+    private readonly alsService: AsyncLocalstorageService,
   ) {}
+
+  async joinCourseByInviteCode(
+    payload: JoinCourseByInviteCodeDto,
+  ): Promise<JoinCourseByInviteCodeResponseDto> {
+    const userId = this.alsService.getUserId();
+    if (!userId) {
+      throw new ForbiddenException('未登录');
+    }
+
+    const student = await this.studentRepository.findOne({
+      where: { user_id: userId },
+    });
+    if (!student) {
+      throw new NotFoundException('学生不存在');
+    }
+
+    const inviteData = await this.invitationService.getInviteDataPreferRedis(
+      payload.code,
+    );
+    if (!inviteData) {
+      throw new BadRequestException('邀请码不存在或已过期');
+    }
+    if (
+      Number(inviteData.type) !== Number(InvitationTypeMap.STUDENT_JOIN_COURSE)
+    ) {
+      throw new BadRequestException('邀请码类型不匹配');
+    }
+    if (!inviteData.course_id || !inviteData.teaching_group_id) {
+      throw new BadRequestException('课程邀请码数据缺失');
+    }
+
+    if (
+      student.school_id &&
+      inviteData.school_id &&
+      String(student.school_id) !== String(inviteData.school_id)
+    ) {
+      throw new BadRequestException('邀请码所属学校与学生不匹配');
+    }
+
+    const course = await this.courseRepository.findOne({
+      where: { id: inviteData.course_id },
+    });
+    if (!course) {
+      throw new NotFoundException('课程不存在');
+    }
+
+    const teachingGroup = await this.courseTeachingGroupRepository.findOne({
+      where: {
+        id: inviteData.teaching_group_id,
+        course_id: course.id,
+      },
+    });
+    if (!teachingGroup) {
+      throw new NotFoundException('教学组不存在');
+    }
+
+    const existing = await this.courseStudentRepository.findOne({
+      where: {
+        course_id: course.id,
+        student_id: student.id,
+      },
+    });
+    if (existing) {
+      throw new BadRequestException('已加入该课程');
+    }
+
+    const relation = this.courseStudentRepository.create({
+      course_id: course.id,
+      student_id: student.id,
+      group_id: teachingGroup.id,
+    });
+    await this.courseStudentRepository.save(relation);
+
+    return {
+      course_id: course.id,
+      teaching_group_id: teachingGroup.id,
+      joined: true,
+    };
+  }
 
   async findAll(query: BaseQueryDto) {
     const {

@@ -2,27 +2,23 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BeforeInsert, Column, Entity, Index, PrimaryColumn } from 'typeorm';
 import { v4 } from 'uuid';
 
-@Entity('course_student')
-@Index('uk_course_student', ['course_id', 'student_id'], { unique: true })
-export class CourseStudent {
+@Entity('course_teaching_group')
+@Index('idx_course_id', ['course_id'])
+export class CourseTeachingGroup {
   @PrimaryColumn({ type: 'varchar', length: 255 })
-  @ApiProperty({ description: '关联ID' })
+  @ApiProperty({ description: '教学组ID' })
   id: string;
 
   @Column({ type: 'varchar', length: 255 })
-  @ApiProperty({ description: '课程ID' })
+  @ApiProperty({ description: '归属课程ID' })
   course_id: string;
 
   @Column({ type: 'varchar', length: 255 })
-  @ApiProperty({ description: '学生ID' })
-  student_id: string;
+  @ApiProperty({ description: '教学组名称' })
+  name: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  @ApiPropertyOptional({ description: '学生加入的教学组ID' })
-  group_id?: string;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  @ApiPropertyOptional({ description: '加入时间戳(s)' })
+  @ApiPropertyOptional({ description: '创建时间戳(s)' })
   create_time?: string;
 
   @BeforeInsert()

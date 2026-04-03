@@ -16,6 +16,7 @@ import { SchoolAdmin } from '@/database/entities/school_admin.entity';
 import { InvitationService } from '../invitation/invitation.service';
 import { UserService } from '../user/user.service';
 import { CurrentUserProfile } from '../user/dto/CurrentUserProfile.dto';
+import { InvitationTypeMap } from '@/common/utils/invite-type.map';
 
 @Injectable()
 export class AuthService {
@@ -84,14 +85,20 @@ export class AuthService {
       throw new HttpException('邀请码不存在或已过期', HttpStatus.BAD_REQUEST);
     }
 
-    // 4. 校验邀请码类型与请求角色是否匹配 (0:老师, 1:学生)
-    if (role_id === AdminRolesMap.teacher && inviteData.type !== 0) {
+    // 4. 校验邀请码类型与请求角色是否匹配
+    if (
+      role_id === AdminRolesMap.teacher &&
+      inviteData.type !== InvitationTypeMap.TEACHER_JOIN_SCHOOL
+    ) {
       throw new HttpException(
         '邀请码类型与教师角色不匹配',
         HttpStatus.BAD_REQUEST,
       );
     }
-    if (role_id === AdminRolesMap.student && inviteData.type !== 1) {
+    if (
+      role_id === AdminRolesMap.student &&
+      inviteData.type !== InvitationTypeMap.STUDENT_JOIN_SCHOOL
+    ) {
       throw new HttpException(
         '邀请码类型与学生角色不匹配',
         HttpStatus.BAD_REQUEST,

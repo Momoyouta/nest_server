@@ -21,22 +21,35 @@ import { Role } from '@/common/decorators/role.decorator';
 import { AdminRoles } from '@/common/utils/role.map';
 import { Result } from '@/database/types/result.type';
 import {
+  BindTeachingGroupTeachersAdminDto,
+  BindTeachingGroupTeachersAdminResponseDto,
   CourseOutlineDraftDto,
   CourseDeleteParamDto,
   CourseLessonOutlineQueryDto,
   CourseListQueryDto,
   CourseListResponseDto,
+  CreateTeachingGroupAdminDto,
+  CreateTeachingGroupAdminResponseDto,
   CreateCourseDto,
   CreateCourseResponseDto,
+  DeleteTeachingGroupAdminResponseDto,
   DeleteCourseResponseDto,
+  GetTeachingGroupAdminResponseDto,
+  ListTeachingGroupAdminQueryDto,
+  ListTeachingGroupAdminResponseDto,
   PublishCourseOutlineDto,
   PublishCourseOutlineResponseDto,
+  QuerySchoolTeacherByNameAdminDto,
+  QuerySchoolTeacherByNameAdminResponseDto,
   QuickUpdateChapterTitleDto,
   QuickUpdateChapterTitleResponseDto,
   QuickUpdateLessonDto,
   QuickUpdateLessonResponseDto,
   SaveCourseDraftDto,
   SaveCourseDraftResponseDto,
+  TeachingGroupIdParamDto,
+  UpdateTeachingGroupAdminDto,
+  UpdateTeachingGroupAdminResponseDto,
   UpdateCourseDto,
   UpdateCourseCoverDto,
   UpdateCourseResponseDto,
@@ -62,6 +75,78 @@ export class CourseController {
   async createCourseAdmin(@Body() payload: CreateCourseDto) {
     const data = await this.courseService.createCourseAdmin(payload);
     return Result.success('创建成功', data);
+  }
+
+  @Post('createTeachingGroupAdmin')
+  @AdminAuth()
+  @Role(...AdminRoles)
+  @ApiOperation({ summary: '创建教学组' })
+  @ApiBody({ type: CreateTeachingGroupAdminDto })
+  @ApiResponse({
+    status: 200,
+    description: '创建成功',
+    type: CreateTeachingGroupAdminResponseDto,
+  })
+  async createTeachingGroupAdmin(@Body() payload: CreateTeachingGroupAdminDto) {
+    const data = await this.courseService.createTeachingGroupAdmin(payload);
+    return Result.success('创建成功', data);
+  }
+
+  @Get('listTeachingGroupAdmin')
+  @AdminAuth()
+  @Role(...AdminRoles)
+  @ApiOperation({ summary: '分页查询课程教学组' })
+  @ApiResponse({
+    status: 200,
+    description: '查询成功',
+    type: ListTeachingGroupAdminResponseDto,
+  })
+  async listTeachingGroupAdmin(@Query() query: ListTeachingGroupAdminQueryDto) {
+    const data = await this.courseService.listTeachingGroupAdmin(query);
+    return Result.success('查询成功', data);
+  }
+
+  @Get('getTeachingGroupAdmin/:id')
+  @AdminAuth()
+  @Role(...AdminRoles)
+  @ApiOperation({ summary: '查询教学组详情' })
+  @ApiResponse({
+    status: 200,
+    description: '查询成功',
+    type: GetTeachingGroupAdminResponseDto,
+  })
+  async getTeachingGroupAdmin(@Param() params: TeachingGroupIdParamDto) {
+    const data = await this.courseService.getTeachingGroupAdmin(params.id);
+    return Result.success('查询成功', data);
+  }
+
+  @Put('updateTeachingGroupAdmin')
+  @AdminAuth()
+  @Role(...AdminRoles)
+  @ApiOperation({ summary: '更新教学组' })
+  @ApiBody({ type: UpdateTeachingGroupAdminDto })
+  @ApiResponse({
+    status: 200,
+    description: '更新成功',
+    type: UpdateTeachingGroupAdminResponseDto,
+  })
+  async updateTeachingGroupAdmin(@Body() payload: UpdateTeachingGroupAdminDto) {
+    const data = await this.courseService.updateTeachingGroupAdmin(payload);
+    return Result.success('更新成功', data);
+  }
+
+  @Delete('deleteTeachingGroupAdmin/:id')
+  @AdminAuth()
+  @Role(...AdminRoles)
+  @ApiOperation({ summary: '删除教学组' })
+  @ApiResponse({
+    status: 200,
+    description: '删除成功',
+    type: DeleteTeachingGroupAdminResponseDto,
+  })
+  async deleteTeachingGroupAdmin(@Param() params: TeachingGroupIdParamDto) {
+    const data = await this.courseService.deleteTeachingGroupAdmin(params.id);
+    return Result.success('删除成功', data);
   }
 
   @Put('updateCourseAdmin')
@@ -143,6 +228,40 @@ export class CourseController {
   async updateLessonQuickAdmin(@Body() payload: QuickUpdateLessonDto) {
     const data = await this.courseService.updateLessonQuickAdmin(payload);
     return Result.success('更新成功', data);
+  }
+
+  @Put('bindTeachingGroupTeachersAdmin')
+  @AdminAuth()
+  @Role(...AdminRoles)
+  @ApiOperation({ summary: '绑定教学组任课老师（覆盖式同步）' })
+  @ApiBody({ type: BindTeachingGroupTeachersAdminDto })
+  @ApiResponse({
+    status: 200,
+    description: '绑定成功',
+    type: BindTeachingGroupTeachersAdminResponseDto,
+  })
+  async bindTeachingGroupTeachersAdmin(
+    @Body() payload: BindTeachingGroupTeachersAdminDto,
+  ) {
+    const data =
+      await this.courseService.bindTeachingGroupTeachersAdmin(payload);
+    return Result.success('绑定成功', data);
+  }
+
+  @Get('querySchoolTeacherByNameAdmin')
+  @AdminAuth()
+  @Role(...AdminRoles)
+  @ApiOperation({ summary: '按本校与姓名前缀查询老师' })
+  @ApiResponse({
+    status: 200,
+    description: '查询成功',
+    type: QuerySchoolTeacherByNameAdminResponseDto,
+  })
+  async querySchoolTeacherByNameAdmin(
+    @Query() query: QuerySchoolTeacherByNameAdminDto,
+  ) {
+    const data = await this.courseService.querySchoolTeacherByNameAdmin(query);
+    return Result.success('查询成功', data);
   }
 
   @Get('getCourseLessonOutline/:id')

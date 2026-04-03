@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMinSize,
   IsArray,
   IsIn,
   IsInt,
@@ -169,6 +170,228 @@ export class CourseLessonOutlineQueryDto {
   @IsString()
   @IsIn(CourseOutlineSourceValues)
   source?: string;
+}
+
+export class BindTeachingGroupTeachersAdminDto {
+  @ApiProperty({ description: '课程ID' })
+  @IsString()
+  @IsNotEmpty()
+  course_id: string;
+
+  @ApiProperty({ description: '教学组ID' })
+  @IsString()
+  @IsNotEmpty()
+  teaching_group_id: string;
+
+  @ApiProperty({
+    description: '教学组绑定教师ID列表',
+    type: [String],
+    example: ['teacher-1', 'teacher-2'],
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  teacher_ids: string[];
+}
+
+export class BindTeachingGroupTeachersAdminResponseDto {
+  @ApiProperty({ description: '课程ID' })
+  course_id: string;
+
+  @ApiProperty({ description: '教学组ID' })
+  teaching_group_id: string;
+
+  @ApiProperty({
+    description: '最终绑定的教师ID列表',
+    type: [String],
+  })
+  teacher_ids: string[];
+
+  @ApiProperty({ description: '是否更新成功', example: true })
+  updated: true;
+}
+
+export class QuerySchoolTeacherByNameAdminDto {
+  @ApiPropertyOptional({
+    description: '学校ID，平台管理员必填，学校管理员可不传',
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  school_id?: string;
+
+  @ApiProperty({ description: '教师姓名前缀关键词', example: '张' })
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiPropertyOptional({ description: '页码', default: 1, example: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ description: '每页条数', default: 10, example: 10 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  pageSize?: number = 10;
+}
+
+export class SchoolTeacherItemDto {
+  @ApiProperty({ description: '教师ID' })
+  id: string;
+
+  @ApiProperty({ description: '教师姓名' })
+  name: string;
+}
+
+export class QuerySchoolTeacherByNameAdminResponseDto {
+  @ApiProperty({ type: [SchoolTeacherItemDto] })
+  list: SchoolTeacherItemDto[];
+
+  @ApiProperty({ description: '总数', example: 20 })
+  total: number;
+}
+
+export class CreateTeachingGroupAdminDto {
+  @ApiProperty({ description: '课程ID' })
+  @IsString()
+  @IsNotEmpty()
+  course_id: string;
+
+  @ApiProperty({ description: '教学组名称', example: '一班教学组' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  name: string;
+}
+
+export class CreateTeachingGroupAdminResponseDto {
+  @ApiProperty({ description: '教学组ID' })
+  id: string;
+
+  @ApiProperty({ description: '课程ID' })
+  course_id: string;
+
+  @ApiProperty({ description: '教学组名称' })
+  name: string;
+
+  @ApiProperty({
+    description: '教学组内教师姓名列表',
+    type: [String],
+    example: ['张三'],
+  })
+  teachers: string[];
+}
+
+export class UpdateTeachingGroupAdminDto {
+  @ApiProperty({ description: '教学组ID' })
+  @IsString()
+  @IsNotEmpty()
+  teaching_group_id: string;
+
+  @ApiProperty({ description: '教学组名称', example: '二班教学组' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  name: string;
+}
+
+export class UpdateTeachingGroupAdminResponseDto {
+  @ApiProperty({ description: '教学组ID' })
+  id: string;
+
+  @ApiProperty({ description: '是否更新成功', example: true })
+  updated: true;
+}
+
+export class TeachingGroupIdParamDto {
+  @ApiProperty({ description: '教学组ID' })
+  @IsString()
+  @IsNotEmpty()
+  id: string;
+}
+
+export class ListTeachingGroupAdminQueryDto {
+  @ApiProperty({ description: '课程ID' })
+  @IsString()
+  @IsNotEmpty()
+  course_id: string;
+
+  @ApiPropertyOptional({ description: '页码', default: 1, example: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ description: '每页条数', default: 10, example: 10 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  pageSize?: number = 10;
+}
+
+export class TeachingGroupItemDto {
+  @ApiProperty({ description: '教学组ID' })
+  id: string;
+
+  @ApiProperty({ description: '课程ID' })
+  course_id: string;
+
+  @ApiProperty({ description: '教学组名称' })
+  name: string;
+
+  @ApiProperty({
+    description: '教学组内教师姓名列表',
+    type: [String],
+    example: ['张三'],
+  })
+  teachers: string[];
+
+  @ApiPropertyOptional({ description: '创建时间戳(s)' })
+  create_time?: string;
+
+  @ApiPropertyOptional({
+    description: '该教学组最近课程邀请码创建时间戳(s)',
+    nullable: true,
+  })
+  invitation_create_time?: string | null;
+
+  @ApiPropertyOptional({
+    description: '该教学组邀请码，可能为null表示无邀请码或邀请码已过期',
+    nullable: true,
+  })
+  invitation_code?: string | null;
+
+  @ApiPropertyOptional({
+    description: '该教学组最近课程邀请码ttl(s)',
+    nullable: true,
+  })
+  invitation_ttl?: number | null;
+}
+
+export class GetTeachingGroupAdminResponseDto extends TeachingGroupItemDto {}
+
+export class ListTeachingGroupAdminResponseDto {
+  @ApiProperty({ type: [TeachingGroupItemDto] })
+  list: TeachingGroupItemDto[];
+
+  @ApiProperty({ description: '总数', example: 20 })
+  total: number;
+}
+
+export class DeleteTeachingGroupAdminResponseDto {
+  @ApiProperty({ description: '教学组ID' })
+  id: string;
+
+  @ApiProperty({ description: '是否删除成功', example: true })
+  deleted: true;
 }
 
 export class CourseListItemDto {

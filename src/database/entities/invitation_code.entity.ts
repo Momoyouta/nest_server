@@ -1,37 +1,54 @@
-import { Entity, Column, PrimaryColumn, PrimaryGeneratedColumn } from 'typeorm';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('invitation_code')
 export class InvitationCode {
   @PrimaryGeneratedColumn()
+  @ApiProperty({ description: '主键ID' })
   id: number;
 
-  @Column({ length: 16, unique: true, comment: '16位唯一邀请码' })
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  @ApiPropertyOptional({ description: '邀请码' })
   code: string;
 
-  @Column({
-    type: 'tinyint',
-    comment: '0:老师加入学校 1:学生加入学校 2:学生加入课程',
-  })
+  @Column({ type: 'int', nullable: true })
+  @ApiPropertyOptional({ description: '邀请码类型' })
   type: number;
 
-  @Column({ name: 'school_id' })
+  @Column({ name: 'school_id', type: 'varchar', length: 255, nullable: true })
+  @ApiPropertyOptional({ description: '学校ID' })
   school_id: string;
 
-  @Column({ nullable: true, comment: '入学年份' })
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  @ApiPropertyOptional({ description: '年级' })
   grade: string;
 
-  @Column({ name: 'class_id', nullable: true })
+  @Column({ name: 'class_id', type: 'varchar', length: 255, nullable: true })
+  @ApiPropertyOptional({ description: '班级ID' })
   class_id: string;
 
-  @Column({ name: 'course_id', nullable: true, comment: '课程id' })
+  @Column({ name: 'course_id', type: 'varchar', length: 255, nullable: true })
+  @ApiPropertyOptional({ description: '课程ID' })
   course_id: string;
 
-  @Column({ name: 'creater_id' })
+  @Column({
+    name: 'teaching_group_id',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  @ApiPropertyOptional({ description: '教学组ID' })
+  teaching_group_id?: string;
+
+  @Column({ name: 'creater_id', type: 'varchar', length: 255, nullable: true })
+  @ApiPropertyOptional({ description: '创建者ID' })
   creater_id: string;
 
-  @Column({ name: 'create_time' })
+  @Column({ name: 'create_time', type: 'varchar', length: 255, nullable: true })
+  @ApiPropertyOptional({ description: '创建时间戳(s)' })
   create_time: string;
 
-  @Column({ nullable: true, comment: '时限 (s)' })
+  @Column({ type: 'bigint', nullable: true })
+  @ApiPropertyOptional({ description: '有效时长(s)' })
   ttl: number;
 }
