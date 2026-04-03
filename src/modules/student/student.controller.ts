@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { StudentService } from '@/modules/student/student.service';
 import { BaseQueryDto } from '../../common/dto/base-query.dto';
@@ -32,7 +33,7 @@ export class StudentController {
     private readonly studentService: StudentService,
     private readonly alsService: AsyncLocalstorageService,
     private readonly userService: UserService,
-  ) {}
+  ) { }
 
   @Get()
   @AdminAuth()
@@ -81,7 +82,6 @@ export class StudentController {
   }
 
   @Post('joinCourseByInviteCode')
-  @AllJwtAuth()
   @Role(AdminRolesMap.student)
   @ApiOperation({ summary: '学生通过邀请码加入课程' })
   @ApiBody({ type: JoinCourseByInviteCodeDto })
@@ -93,5 +93,21 @@ export class StudentController {
   async joinCourseByInviteCode(@Body() payload: JoinCourseByInviteCodeDto) {
     const data = await this.studentService.joinCourseByInviteCode(payload);
     return Result.success('加入成功', data);
+  }
+
+  @Post('leaveCourse')
+  @Role(AdminRolesMap.student)
+  @ApiOperation({ summary: '学生退出课程' })
+  @ApiResponse({
+    status: 200,
+    description: '退出成功',
+  })
+  async leaveCourse(@Body() body: { courseId: string }) {
+    const { courseId } = body;
+    if (!courseId) {
+      throw new BadRequestException('courseId 不能为空');
+    }
+    await this.studentService.leaveCourse(courseId);
+    return Result.success('退出成功', null);
   }
 }

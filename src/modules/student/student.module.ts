@@ -4,9 +4,10 @@ import { StudentService } from '@/modules/student/student.service';
 import { UserModule } from '../user/user.module';
 import { UserService } from '../user/user.service';
 import { InvitationModule } from '@/modules/invitation/invitation.module';
+import { CourseModule } from '../course/course.module';
 
 @Module({
-  imports: [UserModule, InvitationModule],
+  imports: [UserModule, InvitationModule, CourseModule],
   controllers: [StudentController],
   providers: [StudentService, UserService],
   exports: [StudentService],

@@ -1509,6 +1509,75 @@ export class CourseService {
     }
   }
 
+  async clearStudentCourseData(
+    studentId: string,
+    courseId: string,
+    manager: EntityManager,
+  ): Promise<void> {
+    const learningRecordRepo = manager.getRepository(CourseLearningRecord);
+    const submissionRepo = manager.getRepository(AssignmentSubmission);
+    const answerDetailRepo = manager.getRepository(AssignmentAnswerDetail);
+
+    // 1. 删除学习进度
+    await learningRecordRepo.delete({ student_id: studentId, course_id: courseId });
+
+    // 2. 删除题目答题详情 (由于可能存在大量记录，根据 student_id 且关联到该课程的题目清理较为复杂，
+    // 这里简单处理：删除该学生在该课程下所有提交对应的详情)
+    // 先找到该学生在该课程下的所有提交集
+    const submissions = await submissionRepo.find({
+      select: ['id'],
+      where: { student_id: studentId, course_id: courseId },
+    });
+    const submissionIds = submissions.map((s) => s.id);
+
+    if (submissionIds.length > 0) {
+      await answerDetailRepo.delete({ submission_id: In(submissionIds) });
+      // 3. 删除作业提交记录
+      await submissionRepo.delete({ id: In(submissionIds) });
+    }
+  }
+
+  async removeTeacherFromCourse(
+    teacherId: string,
+    courseId: string,
+  ): Promise<void> {
+    const course = await this.courseRepository.findOne({
+      select: ['id', 'creator_id'],
+      where: { id: courseId },
+    });
+    if (!course) {
+      throw new NotFoundException('课程不存在');
+    }
+
+    // 1. 权限校验：创建者不可直接退出
+    if (course.creator_id === teacherId) {
+      throw new BadRequestException('课程创建者不可退出课程');
+    }
+
+    const teachingGroups = await this.courseTeachingGroupRepository.find({
+      select: ['id'],
+      where: { course_id: courseId },
+    });
+    const groupIds = teachingGroups.map((g) => g.id);
+
+    if (groupIds.length === 0) {
+      return;
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      const groupTeacherRepo = manager.getRepository(CourseGroupTeacher);
+
+      // 2. 从教学组中移除教师
+      await groupTeacherRepo.delete({
+        teacher_id: teacherId,
+        group_id: In(groupIds),
+      });
+
+      // 3. 同步课程讲师表 (course_teacher)
+      await this.syncCourseTeachersFromGroups(courseId, manager);
+    });
+  }
+
   private isTempId(id: string): boolean {
     return id.startsWith('temp_');
   }

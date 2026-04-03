@@ -1,4 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
+import { CourseService } from '../course/course.service';
+import { AsyncLocalstorageService } from '../async/async/asyncLocalstorage.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { InjectRepository as BaseInjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
@@ -14,6 +21,8 @@ export class TeacherService {
     private teacherRepository: Repository<Teacher>,
     @BaseInjectRepository(User)
     private userRepository: Repository<User>,
+    private readonly courseService: CourseService,
+    private readonly alsService: AsyncLocalstorageService,
   ) {}
 
   async findAll(query: BaseQueryDto) {
@@ -140,6 +149,24 @@ export class TeacherService {
   async softDelete(userId: string) {
     const teacher = await this.findOne(userId);
     await this.userRepository.update(teacher.user_id, { status: 2 });
+    return { success: true };
+  }
+
+  async leaveCourse(courseId: string): Promise<{ success: boolean }> {
+    const userId = this.alsService.getUserId();
+    if (!userId) {
+      throw new ForbiddenException('未登录');
+    }
+
+    const teacher = await this.teacherRepository.findOne({
+      where: { user_id: userId },
+    });
+    if (!teacher) {
+      throw new NotFoundException('教师信息不存在');
+    }
+
+    await this.courseService.removeTeacherFromCourse(teacher.id, courseId);
+
     return { success: true };
   }
 }

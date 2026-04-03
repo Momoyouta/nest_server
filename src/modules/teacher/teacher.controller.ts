@@ -10,6 +10,7 @@ import {
   UseGuards,
   Req,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { TeacherService } from './teacher.service';
 import { BaseQueryDto } from '../../common/dto/base-query.dto';
@@ -75,5 +76,15 @@ export class TeacherController {
   async remove(@Param('id') id: string) {
     await this.teacherService.softDelete(id);
     return Result.success('禁用成功', null);
+  }
+
+  @Get('leaveCourse')
+  @ApiOperation({ summary: '教师退出课程' })
+  async leaveCourse(@Query('courseId') courseId: string) {
+    if (!courseId) {
+      throw new BadRequestException('courseId 不能为空');
+    }
+    await this.teacherService.leaveCourse(courseId);
+    return Result.success('退出成功', null);
   }
 }

@@ -20,6 +20,8 @@ import {
   JoinCourseByInviteCodeDto,
   JoinCourseByInviteCodeResponseDto,
 } from '@/modules/student/dto/join-course-by-invite.dto';
+import { DataSource, In } from 'typeorm';
+import { CourseService } from '../course/course.service';
 
 @Injectable()
 export class StudentService {
@@ -36,7 +38,47 @@ export class StudentService {
     private courseTeachingGroupRepository: Repository<CourseTeachingGroup>,
     private readonly invitationService: InvitationService,
     private readonly alsService: AsyncLocalstorageService,
+    private readonly courseService: CourseService,
+    private readonly dataSource: DataSource,
   ) {}
+
+  async leaveCourse(courseId: string): Promise<{ success: boolean }> {
+    const userId = this.alsService.getUserId();
+    if (!userId) {
+      throw new ForbiddenException('未登录');
+    }
+
+    const student = await this.studentRepository.findOne({
+      where: { user_id: userId },
+    });
+    if (!student) {
+      throw new NotFoundException('学生信息不存在');
+    }
+
+    const courseStudent = await this.courseStudentRepository.findOne({
+      where: { student_id: student.id, course_id: courseId },
+    });
+    if (!courseStudent) {
+      throw new BadRequestException('未加入该课程');
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      // 1. 清理该学生在该课程下的所有数据 (学习记录、作业等)
+      await this.courseService.clearStudentCourseData(
+        student.id,
+        courseId,
+        manager,
+      );
+
+      // 2. 删除入班记录
+      await manager.getRepository(CourseStudent).delete({
+        student_id: student.id,
+        course_id: courseId,
+      });
+    });
+
+    return { success: true };
+  }
 
   async joinCourseByInviteCode(
     payload: JoinCourseByInviteCodeDto,
