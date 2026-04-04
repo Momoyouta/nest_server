@@ -260,4 +260,16 @@ export class TeacherService {
       };
     });
   }
+
+  async listMyCreatedCourses(query: any) {
+    const userId = this.alsService.getUserId();
+    if (!userId) {
+      throw new ForbiddenException('未登录');
+    }
+    return this.courseService.listMyCreatedCourses(query, userId);
+  }
+
+  async createCourse(payload: any) {
+    return this.courseService.createCourseUser(payload);
+  }
 }

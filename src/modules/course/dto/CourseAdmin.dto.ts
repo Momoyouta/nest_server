@@ -53,6 +53,14 @@ export class CreateCourseDto {
   description?: string;
 }
 
+export class CreateCourseTeacherDto {
+  @ApiProperty({ description: '课程名称', example: '高等数学一' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  name: string;
+}
+
 export class UpdateCourseDto {
   @ApiProperty({ description: '课程ID' })
   @IsString()
@@ -376,7 +384,7 @@ export class TeachingGroupItemDto {
   invitation_ttl?: number | null;
 }
 
-export class GetTeachingGroupAdminResponseDto extends TeachingGroupItemDto {}
+export class GetTeachingGroupAdminResponseDto extends TeachingGroupItemDto { }
 
 export class ListTeachingGroupAdminResponseDto {
   @ApiProperty({ type: [TeachingGroupItemDto] })
@@ -495,6 +503,33 @@ export class ListStudentCoursesQueryDto {
   @IsString()
   @IsNotEmpty()
   student_id: string;
+
+  @ApiPropertyOptional({ description: '学校ID，可选', example: 'school-uuid' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  school_id?: string;
+}
+
+export class ListMyCreatedCoursesQueryDto {
+  @ApiPropertyOptional({ description: '页码', default: 1, example: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ description: '每页条数', default: 10, example: 10 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  pageSize?: number = 10;
+
+  @ApiPropertyOptional({ description: '课程名称关键词', example: '数学' })
+  @IsOptional()
+  @IsString()
+  keyword?: string;
 
   @ApiPropertyOptional({ description: '学校ID，可选', example: 'school-uuid' })
   @IsOptional()
@@ -691,7 +726,7 @@ export class SaveCourseDraftDto {
   draft_content: CourseOutlineDraftDto;
 }
 
-export class PublishCourseOutlineDto extends SaveCourseDraftDto {}
+export class PublishCourseOutlineDto extends SaveCourseDraftDto { }
 
 export class ChapterQuickUpdateDto {
   @ApiProperty({ description: '章节ID', example: '201' })
@@ -818,7 +853,7 @@ export class CourseBasicResponseDto {
 
 export class CreateCourseResponseDto {
   @ApiProperty({ description: '课程ID' })
-  id: string;
+  course_id: string;
 }
 
 export class SaveCourseDraftResponseDto {

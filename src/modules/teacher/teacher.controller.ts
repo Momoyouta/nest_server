@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { TeacherService } from './teacher.service';
 import { BaseQueryDto } from '../../common/dto/base-query.dto';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Result } from '../../database/types/result.type';
 import { Role } from '../../common/decorators/role.decorator';
 import { AdminRoles, AdminRolesMap } from '../../common/utils/role.map';
@@ -22,6 +22,12 @@ import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorag
 import { UserService } from '../user/user.service';
 import * as _ from 'lodash';
 import { AdminAuth } from '@/common/decorators/admin-auth.decorator';
+import {
+  ListMyCreatedCoursesQueryDto,
+  CourseUserListResponseDto,
+  CreateCourseTeacherDto,
+  CreateCourseResponseDto,
+} from '../course/dto/CourseAdmin.dto';
 
 @ApiTags('教师管理')
 @Controller('teacher')
@@ -58,6 +64,30 @@ export class TeacherController {
     }
     const data = await this.teacherService.getMyGroups(courseId);
     return Result.success('查询成功', data);
+  }
+
+  @Get('myCreatedCourses')
+  @ApiOperation({ summary: '查询当前教师创建的课程' })
+  @ApiResponse({
+    status: 200,
+    description: '查询成功',
+    type: CourseUserListResponseDto,
+  })
+  async myCreatedCourses(@Query() query: ListMyCreatedCoursesQueryDto) {
+    const data = await this.teacherService.listMyCreatedCourses(query);
+    return Result.success('查询成功', data);
+  }
+
+  @Post('createCourse')
+  @ApiOperation({ summary: '教师快捷创建课程' })
+  @ApiResponse({
+    status: 200,
+    description: '创建成功',
+    type: CreateCourseResponseDto,
+  })
+  async createCourse(@Body() payload: CreateCourseTeacherDto) {
+    const data = await this.teacherService.createCourse(payload);
+    return Result.success('创建成功', data);
   }
 
   @Get(':id')
