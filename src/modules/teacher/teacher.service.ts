@@ -11,8 +11,12 @@ import { InjectRepository as BaseInjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import { Teacher } from '../../database/entities/teacher.entity';
 import { User } from '../../database/entities/user.entity';
+import { CourseTeachingGroup } from '../../database/entities/course_teaching_group.entity';
+import { CourseGroupTeacher } from '../../database/entities/course_group_teacher.entity';
+import { InvitationCode } from '../../database/entities/invitation_code.entity';
 import { BaseQueryDto } from '../../common/dto/base-query.dto';
 import * as bcrypt from 'bcrypt';
+import { In } from 'typeorm';
 
 @Injectable()
 export class TeacherService {
@@ -21,6 +25,12 @@ export class TeacherService {
     private teacherRepository: Repository<Teacher>,
     @BaseInjectRepository(User)
     private userRepository: Repository<User>,
+    @BaseInjectRepository(CourseTeachingGroup)
+    private teachingGroupRepository: Repository<CourseTeachingGroup>,
+    @BaseInjectRepository(CourseGroupTeacher)
+    private groupTeacherRepository: Repository<CourseGroupTeacher>,
+    @BaseInjectRepository(InvitationCode)
+    private invitationRepository: Repository<InvitationCode>,
     private readonly courseService: CourseService,
     private readonly alsService: AsyncLocalstorageService,
   ) {}
@@ -168,5 +178,86 @@ export class TeacherService {
     await this.courseService.removeTeacherFromCourse(teacher.id, courseId);
 
     return { success: true };
+  }
+
+  async getMyGroups(courseId: string) {
+    const userId = this.alsService.getUserId();
+    if (!userId) {
+      throw new ForbiddenException('未登录');
+    }
+
+    const teacher = await this.teacherRepository.findOne({
+      where: { user_id: userId },
+    });
+    if (!teacher) {
+      throw new NotFoundException('教师信息不存在');
+    }
+
+    // 1. 查找该教师在该课程中所属的教学组ID
+    const teacherGroups = await this.groupTeacherRepository
+      .createQueryBuilder('gt')
+      .innerJoin(CourseTeachingGroup, 'tg', 'gt.group_id = tg.id')
+      .where('tg.course_id = :courseId', { courseId })
+      .andWhere('gt.teacher_id = :teacherId', { teacherId: teacher.id })
+      .select('gt.group_id', 'groupId')
+      .getRawMany();
+
+    const groupIds = teacherGroups.map((g) => g.groupId);
+    if (groupIds.length === 0) {
+      return [];
+    }
+
+    // 2. 查找这些教学组的基本信息
+    const groups = await this.teachingGroupRepository.find({
+      where: { id: In(groupIds) },
+    });
+
+    // 3. 查找这些教学组的所有成员信息
+    const members = await this.groupTeacherRepository
+      .createQueryBuilder('gt')
+      .innerJoin(Teacher, 't', 'gt.teacher_id = t.id')
+      .innerJoin(User, 'u', 't.user_id = u.id')
+      .where('gt.group_id IN (:...groupIds)', { groupIds })
+      .select([
+        'gt.group_id as group_id',
+        't.id as teacher_id',
+        'u.name as teacher_name',
+      ])
+      .getRawMany();
+
+    // 4. 查找这些教学组的邀请码
+    const invitations = await this.invitationRepository.find({
+      where: {
+        teaching_group_id: In(groupIds),
+        type: 2, // STUDENT_JOIN_COURSE
+      },
+      order: {
+        create_time: 'DESC',
+      },
+    });
+
+    return groups.map((group) => {
+      const groupInvite = invitations.find(
+        (inv) => inv.teaching_group_id === group.id,
+      );
+      let expireTime: string | null = null;
+      if (groupInvite && groupInvite.ttl > 0) {
+        expireTime = String(
+          Number(groupInvite.create_time) + Number(groupInvite.ttl),
+        );
+      }
+
+      return {
+        ...group,
+        invite_code: groupInvite?.code || null,
+        expire_time: expireTime,
+        teachers: members
+          .filter((m) => m.group_id === group.id)
+          .map((m) => ({
+            teacher_id: m.teacher_id,
+            name: m.teacher_name,
+          })),
+      };
+    });
   }
 }

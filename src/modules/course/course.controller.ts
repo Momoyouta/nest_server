@@ -58,12 +58,17 @@ import {
   CourseUserListResponseDto,
 } from '@/modules/course/dto/CourseAdmin.dto';
 import { CourseService } from '@/modules/course/course.service';
+import { InvitationService } from '../invitation/invitation.service';
+import { CreateCourseInviteDto } from '@/common/dto/invite.dto';
 
 @ApiTags('课程管理')
 @ApiBearerAuth('access_token')
 @Controller('course')
 export class CourseController {
-  constructor(private readonly courseService: CourseService) { }
+  constructor(
+    private readonly courseService: CourseService,
+    private readonly invitationService: InvitationService,
+  ) {}
 
   @Post('createCourseAdmin')
   @AdminAuth()
@@ -449,5 +454,14 @@ export class CourseController {
   async listStudentCoursesUser(@Query() query: ListStudentCoursesQueryDto) {
     const data = await this.courseService.listStudentCoursesUser(query);
     return Result.success('查询成功', data);
+  }
+
+  @Post('createInvite')
+  @ApiOperation({ summary: '创建课程邀请码（教师用户端）' })
+  @ApiBody({ type: CreateCourseInviteDto })
+  async createInvite(@Body() payload: CreateCourseInviteDto) {
+    const data =
+      await this.invitationService.createCourseInviteByCurrentUser(payload);
+    return Result.success('创建成功', data);
   }
 }

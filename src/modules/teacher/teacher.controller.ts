@@ -40,6 +40,26 @@ export class TeacherController {
     return Result.success('查询成功', data);
   }
 
+  @Get('leaveCourse')
+  @ApiOperation({ summary: '教师退出课程' })
+  async leaveCourse(@Query('courseId') courseId: string) {
+    if (!courseId) {
+      throw new BadRequestException('courseId 不能为空');
+    }
+    await this.teacherService.leaveCourse(courseId);
+    return Result.success('退出成功', null);
+  }
+
+  @Get('myGroups')
+  @ApiOperation({ summary: '获取当前教师某个课程所属教学组' })
+  async getMyGroups(@Query('course_id') courseId: string) {
+    if (!courseId) {
+      throw new BadRequestException('course_id 不能为空');
+    }
+    const data = await this.teacherService.getMyGroups(courseId);
+    return Result.success('查询成功', data);
+  }
+
   @Get(':id')
   @AdminAuth()
   @ApiOperation({ summary: '获取教师详情' })
@@ -76,15 +96,5 @@ export class TeacherController {
   async remove(@Param('id') id: string) {
     await this.teacherService.softDelete(id);
     return Result.success('禁用成功', null);
-  }
-
-  @Get('leaveCourse')
-  @ApiOperation({ summary: '教师退出课程' })
-  async leaveCourse(@Query('courseId') courseId: string) {
-    if (!courseId) {
-      throw new BadRequestException('courseId 不能为空');
-    }
-    await this.teacherService.leaveCourse(courseId);
-    return Result.success('退出成功', null);
   }
 }

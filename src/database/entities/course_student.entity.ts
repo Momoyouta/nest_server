@@ -25,6 +25,14 @@ export class CourseStudent {
   @ApiPropertyOptional({ description: '加入时间戳(s)' })
   create_time?: string;
 
+  @Column({ type: 'int', nullable: true, default: 0 })
+  @ApiPropertyOptional({ description: '已完成课时数' })
+  completed_lesson_count?: number;
+
+  @Column({ type: 'int', nullable: true, default: 0 })
+  @ApiPropertyOptional({ description: '学习进度百分比' })
+  progress_percent?: number;
+
   @BeforeInsert()
   setCreateFields() {
     if (!this.id) {

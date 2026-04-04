@@ -3,9 +3,10 @@ import { CourseController } from '@/modules/course/course.controller';
 import { CourseService } from '@/modules/course/course.service';
 import { UserModule } from '../user/user.module';
 import { FileModule } from '../file/file.module';
+import { InvitationModule } from '../invitation/invitation.module';
 
 @Module({
-  imports: [UserModule, FileModule],
+  imports: [UserModule, FileModule, InvitationModule],
   controllers: [CourseController],
   providers: [CourseService],
   exports: [CourseService],
