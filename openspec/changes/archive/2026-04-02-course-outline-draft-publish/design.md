@@ -3,7 +3,7 @@
 当前课程模块仅覆盖课程基础 CRUD，章节/课时主要存在于实体和删除级联逻辑中，尚未形成“草稿编辑 + 统一发布”的管理流程。根据 MySQL 实表（`study_platform`）核验：
 - `course` 含 `draft_content(json)` 列；
 - `course_chapter` 字段为 `id/course_id/title/sort_order/create_time/update_time`；
-- `course_lesson` 字段为 `id/chapter_id/title/description/resource_id/duration/sort_order/create_time/update_time`。
+- `course_lesson` 字段为 `id/chapter_id/title/description/video_path/duration/sort_order/create_time/update_time`。
 
 约束：
 - 对外新增 5 个接口（4 个管理端 + 1 个课时查询接口）；
@@ -59,7 +59,7 @@
 - Body:
   - `course_id: string`
   - `draft_content: CourseOutlineDraftDto`
-  - `lesson: { lesson_id: string; chapter_id: string; title: string; description?: string; resource_id?: string | null; duration?: number; sort_order: number }`
+  - `lesson: { lesson_id: string; chapter_id: string; title: string; description?: string; video_path?: string | null; duration?: number; sort_order: number }`
 - Response: `Result<{ course_id: string; lesson_id: string; updated: true }>`
 
 5. `GET /course/getCourseLessonOutline/:id`

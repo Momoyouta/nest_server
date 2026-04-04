@@ -65,6 +65,7 @@ import { CourseStatusMap } from '@/common/utils/course.map';
 import { AdminRolesMap, PlatformAdminRoles, SchoolAdminRoles } from '@/common/utils/role.map';
 import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
 import { StorageService } from '../file/storage/storage.service';
+import { FileChunk } from '../file/chunk/chunk.entity';
 import {
   CourseOutlineSource,
   CourseOutlineSourceMap,
@@ -801,16 +802,13 @@ export class CourseService {
     );
     this.validateDraftAgainstCourse(payload.draft_content, course);
 
-    course.draft_content = payload.draft_content as unknown as Record<
-      string,
-      unknown
-    >;
-    await this.courseRepository.save(course);
+    await this.dataSource.transaction(async (manager) => {
+      await this.processAllTempVideosInDraft(manager, course.school_id, payload.draft_content);
+      const courseRepo = manager.getRepository(Course);
+      await courseRepo.update(course.id, { draft_content: payload.draft_content as any });
+    });
 
-    return {
-      course_id: course.id,
-      updated: true,
-    };
+    return { course_id: course.id, updated: true };
   }
 
   async saveCourseDraftUser(
@@ -823,16 +821,13 @@ export class CourseService {
     );
     this.validateDraftAgainstCourse(payload.draft_content, course);
 
-    course.draft_content = payload.draft_content as unknown as Record<
-      string,
-      unknown
-    >;
-    await this.courseRepository.save(course);
+    await this.dataSource.transaction(async (manager) => {
+      await this.processAllTempVideosInDraft(manager, course.school_id, payload.draft_content);
+      const courseRepo = manager.getRepository(Course);
+      await courseRepo.update(course.id, { draft_content: payload.draft_content as any });
+    });
 
-    return {
-      course_id: course.id,
-      updated: true,
-    };
+    return { course_id: course.id, updated: true };
   }
 
   async publishCourseOutlineAdmin(
@@ -845,6 +840,80 @@ export class CourseService {
     );
     this.validateDraftAgainstCourse(payload.draft_content, course);
 
+    return this.executePublishCourseOutlineDB(
+      course,
+      payload.draft_content as unknown as Record<string, unknown>,
+    );
+  }
+
+  async publishCourseOutlineUser(
+    payload: PublishCourseOutlineDto,
+  ): Promise<PublishCourseOutlineResponseDto> {
+    const user = await this.getCurrentUserOrThrow();
+    const course = await this.findCourseWithTeacherPermissionOrThrow(
+      payload.course_id,
+      user.id,
+    );
+    this.validateDraftAgainstCourse(payload.draft_content, course);
+
+    return this.executePublishCourseOutlineDB(
+      course,
+      payload.draft_content as unknown as Record<string, unknown>,
+    );
+  }
+
+  private async processLessonVideoFile(
+    manager: EntityManager,
+    schoolId: string,
+    tempPath: string,
+  ): Promise<string> {
+    const match = tempPath.match(/^uploads\/temp\/videos\/(.+)$/);
+    if (!match) return tempPath;
+
+    const fileName = match[1];
+    const dotIndex = fileName.lastIndexOf('.');
+    const fileHash = dotIndex !== -1 ? fileName.substring(0, dotIndex) : fileName;
+    const ext = dotIndex !== -1 ? fileName.substring(dotIndex) : '.mp4';
+
+    const dir1 = fileHash.substring(0, 2);
+    const dir2 = fileHash.substring(2, 4);
+
+    const destRelativeDir = `schools/${schoolId}/resource_library/videos/${dir1}/${dir2}`;
+    const destRelativePath = `${destRelativeDir}/${fileHash}${ext}`;
+
+    this.storageService.moveFile(tempPath, destRelativePath);
+
+    const chunkRepo = manager.getRepository(FileChunk);
+    const chunkRecord = await chunkRepo.findOne({ where: { fileHash } });
+    if (chunkRecord) {
+      chunkRecord.targetPath = destRelativeDir;
+      await chunkRepo.save(chunkRecord);
+    }
+
+    return `/${destRelativePath}`;
+  }
+
+  private async processAllTempVideosInDraft(
+    manager: EntityManager,
+    schoolId: string,
+    draftContent: any,
+  ): Promise<void> {
+    if (!draftContent || !Array.isArray(draftContent.chapters)) return;
+    for (const chapter of draftContent.chapters) {
+      if (Array.isArray(chapter.lessons)) {
+        for (const lesson of chapter.lessons) {
+          if (typeof lesson.video_path === 'string' && lesson.video_path.startsWith('uploads/temp/videos/')) {
+            lesson.video_path = await this.processLessonVideoFile(manager, schoolId, lesson.video_path);
+          }
+        }
+      }
+    }
+  }
+
+  private async executePublishCourseOutlineDB(
+    course: Course,
+    draft_content: Record<string, unknown>,
+  ): Promise<PublishCourseOutlineResponseDto> {
     return this.dataSource.transaction(async (manager) => {
       const courseRepository = manager.getRepository(Course);
       const chapterRepository = manager.getRepository(CourseChapter);
@@ -856,10 +925,7 @@ export class CourseService {
       }
 
       // 先落草稿，再执行后续发布差异同步（同事务，失败会整体回滚）
-      courseEntity.draft_content = payload.draft_content as unknown as Record<
-        string,
-        unknown
-      >;
+      courseEntity.draft_content = draft_content;
       await courseRepository.save(courseEntity);
 
       const existingChapters = await chapterRepository.find({
@@ -872,7 +938,9 @@ export class CourseService {
       const chapterIdMap = new Map<string, string>();
       const chapterMappings: PublishIdMappingItem[] = [];
 
-      for (const chapterItem of payload.draft_content.chapters || []) {
+      const draftChapters = (draft_content.chapters as any[]) || [];
+
+      for (const chapterItem of draftChapters) {
         const chapterId = String(chapterItem.chapter_id);
         if (this.isTempId(chapterId)) {
           const createdChapter = chapterRepository.create({
@@ -915,7 +983,7 @@ export class CourseService {
       const keepLessonIds = new Set<string>();
       const lessonMappings: PublishIdMappingItem[] = [];
 
-      for (const chapterItem of payload.draft_content.chapters || []) {
+      for (const chapterItem of draftChapters) {
         const chapterId = String(chapterItem.chapter_id);
         const realChapterId = chapterIdMap.get(chapterId);
         if (!realChapterId) {
@@ -924,12 +992,15 @@ export class CourseService {
 
         for (const lessonItem of chapterItem.lessons || []) {
           const lessonId = String(lessonItem.lesson_id);
+          const videoPath = lessonItem.video_path ? await this.processLessonVideoFile(manager, course.school_id, lessonItem.video_path) : null;
+          lessonItem.video_path = videoPath;
+
           if (this.isTempId(lessonId)) {
             const createdLesson: CourseLesson = lessonRepository.create({
               chapter_id: realChapterId,
               title: lessonItem.title,
               description: lessonItem.description || '',
-              resource_id: lessonItem.resource_id ?? null,
+              video_path: videoPath,
               duration: Number(lessonItem.duration ?? 0),
               sort_order: Number(lessonItem.sort_order ?? 0),
             });
@@ -950,7 +1021,7 @@ export class CourseService {
             lesson.chapter_id = realChapterId;
             lesson.title = lessonItem.title;
             lesson.description = lessonItem.description || '';
-            lesson.resource_id = lessonItem.resource_id ?? null;
+            lesson.video_path = videoPath;
             lesson.duration = Number(lessonItem.duration ?? 0);
             lesson.sort_order = Number(lessonItem.sort_order ?? 0);
             const savedLesson = await lessonRepository.save(lesson);
@@ -977,6 +1048,7 @@ export class CourseService {
       }
 
       courseEntity.status = Number(CourseStatusMap.PUBLISHED);
+      courseEntity.draft_content = { ...draft_content };
       await courseRepository.save(courseEntity);
 
       const chapter_count = await chapterRepository.count({
@@ -1019,31 +1091,48 @@ export class CourseService {
     );
     this.validateDraftAgainstCourse(payload.draft_content, course);
 
-    const chapter = await this.courseChapterRepository.findOne({
-      where: {
-        id: payload.chapter.chapter_id,
-        course_id: course.id,
-      },
+    await this.dataSource.transaction(async (manager) => {
+      await this.processAllTempVideosInDraft(manager, course.school_id, payload.draft_content);
+      const chapterRepo = manager.getRepository(CourseChapter);
+      const chapter = await chapterRepo.findOne({
+        where: { id: payload.chapter.chapter_id, course_id: course.id },
+      });
+      if (!chapter) throw new NotFoundException('章节不存在');
+
+      chapter.title = payload.chapter.title;
+      await chapterRepo.save(chapter);
+
+      await manager.getRepository(Course).update(course.id, { draft_content: payload.draft_content as any });
     });
 
-    if (!chapter) {
-      throw new NotFoundException('章节不存在');
-    }
+    return { course_id: course.id, chapter_id: payload.chapter.chapter_id, updated: true };
+  }
 
-    course.draft_content = payload.draft_content as unknown as Record<
-      string,
-      unknown
-    >;
-    await this.courseRepository.save(course);
+  async updateChapterTitleQuickUser(
+    payload: QuickUpdateChapterTitleDto,
+  ): Promise<QuickUpdateChapterTitleResponseDto> {
+    const user = await this.getCurrentUserOrThrow();
+    const course = await this.findCourseWithTeacherPermissionOrThrow(
+      payload.course_id,
+      user.id,
+    );
+    this.validateDraftAgainstCourse(payload.draft_content, course);
 
-    chapter.title = payload.chapter.title;
-    await this.courseChapterRepository.save(chapter);
+    await this.dataSource.transaction(async (manager) => {
+      await this.processAllTempVideosInDraft(manager, course.school_id, payload.draft_content);
+      const chapterRepo = manager.getRepository(CourseChapter);
+      const chapter = await chapterRepo.findOne({
+        where: { id: payload.chapter.chapter_id, course_id: course.id },
+      });
+      if (!chapter) throw new NotFoundException('章节不存在');
 
-    return {
-      course_id: course.id,
-      chapter_id: chapter.id,
-      updated: true,
-    };
+      chapter.title = payload.chapter.title;
+      await chapterRepo.save(chapter);
+
+      await manager.getRepository(Course).update(course.id, { draft_content: payload.draft_content as any });
+    });
+
+    return { course_id: course.id, chapter_id: payload.chapter.chapter_id, updated: true };
   }
 
   async updateLessonQuickAdmin(
@@ -1056,48 +1145,88 @@ export class CourseService {
     );
     this.validateDraftAgainstCourse(payload.draft_content, course);
 
-    const chapter = await this.courseChapterRepository.findOne({
-      where: {
-        id: payload.lesson.chapter_id,
-        course_id: course.id,
-      },
+    await this.dataSource.transaction(async (manager) => {
+      if (payload.lesson.video_path && payload.lesson.video_path.startsWith('uploads/temp/videos/')) {
+        payload.lesson.video_path = await this.processLessonVideoFile(manager, course.school_id, payload.lesson.video_path);
+      }
+      await this.processAllTempVideosInDraft(manager, course.school_id, payload.draft_content);
+
+      const chapterRepo = manager.getRepository(CourseChapter);
+      const lessonRepo = manager.getRepository(CourseLesson);
+
+      const chapter = await chapterRepo.findOne({
+        where: { id: payload.lesson.chapter_id, course_id: course.id },
+      });
+      if (!chapter) throw new NotFoundException('章节不存在');
+
+      const lesson = await lessonRepo
+        .createQueryBuilder('lesson')
+        .innerJoin(CourseChapter, 'chapter', 'chapter.id = lesson.chapter_id')
+        .where('lesson.id = :lessonId', { lessonId: payload.lesson.lesson_id })
+        .andWhere('chapter.course_id = :courseId', { courseId: course.id })
+        .getOne();
+      if (!lesson) throw new NotFoundException('课时不存在');
+
+      await manager.getRepository(Course).update(course.id, { draft_content: payload.draft_content as any });
+
+      lesson.chapter_id = chapter.id;
+      lesson.title = payload.lesson.title;
+      lesson.description = payload.lesson.description || '';
+      lesson.video_path = payload.lesson.video_path ?? null;
+      lesson.duration = Number(payload.lesson.duration ?? 0);
+      lesson.sort_order = Number(payload.lesson.sort_order ?? 0);
+
+      await lessonRepo.save(lesson);
     });
 
-    if (!chapter) {
-      throw new NotFoundException('章节不存在');
-    }
+    return { course_id: course.id, lesson_id: payload.lesson.lesson_id, updated: true };
+  }
 
-    const lesson = await this.courseLessonRepository
-      .createQueryBuilder('lesson')
-      .innerJoin(CourseChapter, 'chapter', 'chapter.id = lesson.chapter_id')
-      .where('lesson.id = :lessonId', { lessonId: payload.lesson.lesson_id })
-      .andWhere('chapter.course_id = :courseId', { courseId: course.id })
-      .getOne();
+  async updateLessonQuickUser(
+    payload: QuickUpdateLessonDto,
+  ): Promise<QuickUpdateLessonResponseDto> {
+    const user = await this.getCurrentUserOrThrow();
+    const course = await this.findCourseWithTeacherPermissionOrThrow(
+      payload.course_id,
+      user.id,
+    );
+    this.validateDraftAgainstCourse(payload.draft_content, course);
 
-    if (!lesson) {
-      throw new NotFoundException('课时不存在');
-    }
+    await this.dataSource.transaction(async (manager) => {
+      if (payload.lesson.video_path && payload.lesson.video_path.startsWith('uploads/temp/videos/')) {
+        payload.lesson.video_path = await this.processLessonVideoFile(manager, course.school_id, payload.lesson.video_path);
+      }
+      await this.processAllTempVideosInDraft(manager, course.school_id, payload.draft_content);
 
-    course.draft_content = payload.draft_content as unknown as Record<
-      string,
-      unknown
-    >;
-    await this.courseRepository.save(course);
+      const chapterRepo = manager.getRepository(CourseChapter);
+      const lessonRepo = manager.getRepository(CourseLesson);
 
-    lesson.chapter_id = chapter.id;
-    lesson.title = payload.lesson.title;
-    lesson.description = payload.lesson.description || '';
-    lesson.resource_id = payload.lesson.resource_id ?? null;
-    lesson.duration = Number(payload.lesson.duration ?? 0);
-    lesson.sort_order = Number(payload.lesson.sort_order ?? 0);
+      const chapter = await chapterRepo.findOne({
+        where: { id: payload.lesson.chapter_id, course_id: course.id },
+      });
+      if (!chapter) throw new NotFoundException('章节不存在');
 
-    await this.courseLessonRepository.save(lesson);
+      const lesson = await lessonRepo
+        .createQueryBuilder('lesson')
+        .innerJoin(CourseChapter, 'chapter', 'chapter.id = lesson.chapter_id')
+        .where('lesson.id = :lessonId', { lessonId: payload.lesson.lesson_id })
+        .andWhere('chapter.course_id = :courseId', { courseId: course.id })
+        .getOne();
+      if (!lesson) throw new NotFoundException('课时不存在');
 
-    return {
-      course_id: course.id,
-      lesson_id: lesson.id,
-      updated: true,
-    };
+      await manager.getRepository(Course).update(course.id, { draft_content: payload.draft_content as any });
+
+      lesson.chapter_id = chapter.id;
+      lesson.title = payload.lesson.title;
+      lesson.description = payload.lesson.description || '';
+      lesson.video_path = payload.lesson.video_path ?? null;
+      lesson.duration = Number(payload.lesson.duration ?? 0);
+      lesson.sort_order = Number(payload.lesson.sort_order ?? 0);
+
+      await lessonRepo.save(lesson);
+    });
+
+    return { course_id: course.id, lesson_id: payload.lesson.lesson_id, updated: true };
   }
 
   async bindTeachingGroupTeachersAdmin(
@@ -1843,15 +1972,27 @@ export class CourseService {
     return { description: course.description || '' };
   }
 
-  async getCourseCreatorId(id: string): Promise<{ creator_id: string }> {
+  async getCourseBaseInfo(id: string): Promise<{
+    creator_id: string;
+    course_id: string;
+    course_name: string;
+    course_cover: string | null;
+    publish_status: number;
+  }> {
     const course = await this.courseRepository.findOne({
-      select: ['creator_id'],
+      select: ['creator_id', 'id', 'name', 'cover_img', 'status'],
       where: { id },
     });
     if (!course) {
       throw new NotFoundException('课程不存在');
     }
-    return { creator_id: course.creator_id };
+    return {
+      creator_id: course.creator_id,
+      course_id: course.id,
+      course_name: course.name,
+      course_cover: course.cover_img ?? null,
+      publish_status: Number(course.status),
+    };
   }
 
   private async getTeachingGroupTeachersMap(
@@ -2211,12 +2352,12 @@ export class CourseService {
               title: this.toStringWithFallback(lessonObj.title, ''),
               description: this.toStringWithFallback(lessonObj.description, ''),
               sort_order: Number(lessonObj.sort_order ?? 0),
-              resource_id:
-                lessonObj.resource_id === null ||
-                  lessonObj.resource_id === undefined ||
-                  lessonObj.resource_id === ''
+              video_path:
+                lessonObj.video_path === null ||
+                  lessonObj.video_path === undefined ||
+                  lessonObj.video_path === ''
                   ? null
-                  : this.toStringWithFallback(lessonObj.resource_id, ''),
+                  : this.toStringWithFallback(lessonObj.video_path, ''),
               duration: Number(lessonObj.duration ?? 0),
             };
           }),
@@ -2269,7 +2410,7 @@ export class CourseService {
           title: lesson.title,
           description: lesson.description || '',
           sort_order: Number(lesson.sort_order ?? 0),
-          resource_id: lesson.resource_id ?? null,
+          video_path: lesson.video_path ?? null,
           duration: Number(lesson.duration ?? 0),
         })),
       })),

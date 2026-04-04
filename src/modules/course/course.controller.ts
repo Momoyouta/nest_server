@@ -236,6 +236,22 @@ export class CourseController {
     return Result.success('发布成功', data);
   }
 
+  @Post('publishCourseOutline')
+  @Role(AdminRolesMap.teacher)
+  @ApiOperation({
+    summary: '发布课程大纲（教师端，校验创建者控制）',
+  })
+  @ApiBody({ type: PublishCourseOutlineDto })
+  @ApiResponse({
+    status: 200,
+    description: '发布成功',
+    type: PublishCourseOutlineResponseDto,
+  })
+  async publishCourseOutlineUser(@Body() payload: PublishCourseOutlineDto) {
+    const data = await this.courseService.publishCourseOutlineUser(payload);
+    return Result.success('发布成功', data);
+  }
+
   @Put('updateChapterTitleQuickAdmin')
   @AdminAuth()
   @Role(...AdminRoles)
@@ -253,6 +269,22 @@ export class CourseController {
     return Result.success('更新成功', data);
   }
 
+  @Put('updateChapterTitleQuick')
+  @Role(AdminRolesMap.teacher)
+  @ApiOperation({ summary: '快捷更新章节标题（教师端，校验创建者控制）' })
+  @ApiBody({ type: QuickUpdateChapterTitleDto })
+  @ApiResponse({
+    status: 200,
+    description: '更新成功',
+    type: QuickUpdateChapterTitleResponseDto,
+  })
+  async updateChapterTitleQuickUser(
+    @Body() payload: QuickUpdateChapterTitleDto,
+  ) {
+    const data = await this.courseService.updateChapterTitleQuickUser(payload);
+    return Result.success('更新成功', data);
+  }
+
   @Put('updateLessonQuickAdmin')
   @AdminAuth()
   @Role(...AdminRoles)
@@ -265,6 +297,20 @@ export class CourseController {
   })
   async updateLessonQuickAdmin(@Body() payload: QuickUpdateLessonDto) {
     const data = await this.courseService.updateLessonQuickAdmin(payload);
+    return Result.success('更新成功', data);
+  }
+
+  @Put('updateLessonQuick')
+  @Role(AdminRolesMap.teacher)
+  @ApiOperation({ summary: '快捷更新课时（教师端，校验创建者控制）' })
+  @ApiBody({ type: QuickUpdateLessonDto })
+  @ApiResponse({
+    status: 200,
+    description: '更新成功',
+    type: QuickUpdateLessonResponseDto,
+  })
+  async updateLessonQuickUser(@Body() payload: QuickUpdateLessonDto) {
+    const data = await this.courseService.updateLessonQuickUser(payload);
     return Result.success('更新成功', data);
   }
 
@@ -462,8 +508,8 @@ export class CourseController {
     return Result.success('查询成功', data);
   }
 
-  @Get('getCourseCreatorId/:id')
-  @ApiOperation({ summary: '根据课程ID获取创建者ID' })
+  @Get('getCourseBaseInfo/:id')
+  @ApiOperation({ summary: '根据课程ID获取课程基础信息' })
   @ApiResponse({
     status: 200,
     description: '查询成功',
@@ -476,13 +522,17 @@ export class CourseController {
           type: 'object',
           properties: {
             creator_id: { type: 'string' },
+            course_name: { type: 'string' },
+            course_id: { type: 'string' },
+            course_cover: { type: 'string', nullable: true },
+            publish_status: { type: 'number' },
           },
         },
       },
     },
   })
-  async getCourseCreatorId(@Param('id') id: string) {
-    const data = await this.courseService.getCourseCreatorId(id);
+  async getCourseBaseInfo(@Param('id') id: string) {
+    const data = await this.courseService.getCourseBaseInfo(id);
     return Result.success('查询成功', data);
   }
 

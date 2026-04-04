@@ -93,7 +93,7 @@
 - `lesson.sort_order`: `@Type(() => Number) @IsInt @Min(0)`
 - `lesson.duration`: `@Type(() => Number) @IsInt @Min(0)`
 - `lesson.description`: 可选 `@IsString`
-- `lesson.resource_id`: 可选 `@IsString` 或 `null`
+- `lesson.video_path`: 可选 `@IsString` 或 `null`
 
 快捷更新逻辑 MUST：
 - 直接覆盖 `course.draft_content`；

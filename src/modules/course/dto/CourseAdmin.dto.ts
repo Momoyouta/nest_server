@@ -625,7 +625,7 @@ export class CourseOutlineLessonDto {
   })
   @IsOptional()
   @IsString()
-  resource_id?: string | null;
+  video_path?: string | null;
 
   @ApiProperty({ description: '排序值', example: 1 })
   @Type(() => Number)
@@ -717,7 +717,7 @@ export class SaveCourseDraftDto {
               title: '1.2 React 19 新特性',
               description: '',
               sort_order: 2,
-              resource_id: null,
+              video_path: null,
               duration: 0,
             },
           ],
@@ -791,7 +791,7 @@ export class LessonQuickUpdateDto {
   })
   @IsOptional()
   @IsString()
-  resource_id?: string | null;
+  video_path?: string | null;
 
   @ApiProperty({ description: '课时时长（秒）', example: 3400 })
   @Type(() => Number)

@@ -24,7 +24,7 @@ export class CourseLesson {
 
   @Column({ type: 'varchar', length: 500, nullable: true })
   @ApiProperty({ description: '视频资源id', required: false, nullable: true })
-  resource_id?: string | null;
+  video_path?: string | null;
 
   @Column({ type: 'int', default: 0 })
   @ApiProperty({ description: '排序值', default: 0 })
