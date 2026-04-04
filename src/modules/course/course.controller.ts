@@ -18,7 +18,7 @@ import {
 import { AdminAuth } from '@/common/decorators/admin-auth.decorator';
 import { AllJwtAuth } from '@/common/decorators/auth.decorator';
 import { Role } from '@/common/decorators/role.decorator';
-import { AdminRoles } from '@/common/utils/role.map';
+import { AdminRoles, AdminRolesMap, AdminRoleValues } from '@/common/utils/role.map';
 import { Result } from '@/database/types/result.type';
 import {
   BindTeachingGroupTeachersAdminDto,
@@ -68,7 +68,7 @@ export class CourseController {
   constructor(
     private readonly courseService: CourseService,
     private readonly invitationService: InvitationService,
-  ) {}
+  ) { }
 
   @Post('createCourseAdmin')
   @AdminAuth()
@@ -174,6 +174,22 @@ export class CourseController {
     return Result.success('更新成功', data);
   }
 
+  @Put('updateCourse')
+  @Role(AdminRolesMap.teacher)
+  @ApiOperation({
+    summary: '教师用户端更新课程（仅课程创建者，校验 teacher_id 与 course.creator_id）',
+  })
+  @ApiBody({ type: UpdateCourseDto })
+  @ApiResponse({
+    status: 200,
+    description: '更新成功',
+    type: UpdateCourseResponseDto,
+  })
+  async updateCourseUser(@Body() payload: UpdateCourseDto) {
+    const data = await this.courseService.updateCourseUser(payload);
+    return Result.success('更新成功', data);
+  }
+
   @Post('saveCourseDraftAdmin')
   @AdminAuth()
   @Role(...AdminRoles)
@@ -186,6 +202,20 @@ export class CourseController {
   })
   async saveCourseDraftAdmin(@Body() payload: SaveCourseDraftDto) {
     const data = await this.courseService.saveCourseDraftAdmin(payload);
+    return Result.success('保存成功', data);
+  }
+
+  @Post('saveCourseDraft')
+  @Role(AdminRolesMap.teacher)
+  @ApiOperation({ summary: '保存课程大纲草稿（仅覆盖 draft_content）' })
+  @ApiBody({ type: SaveCourseDraftDto })
+  @ApiResponse({
+    status: 200,
+    description: '保存成功',
+    type: SaveCourseDraftResponseDto,
+  })
+  async saveCourseDraftUser(@Body() payload: SaveCourseDraftDto) {
+    const data = await this.courseService.saveCourseDraftUser(payload);
     return Result.success('保存成功', data);
   }
 
@@ -429,6 +459,30 @@ export class CourseController {
   })
   async getCourseDescription(@Param() params: CourseDeleteParamDto) {
     const data = await this.courseService.getCourseDescription(params.id);
+    return Result.success('查询成功', data);
+  }
+
+  @Get('getCourseCreatorId/:id')
+  @ApiOperation({ summary: '根据课程ID获取创建者ID' })
+  @ApiResponse({
+    status: 200,
+    description: '查询成功',
+    schema: {
+      type: 'object',
+      properties: {
+        code: { type: 'number', example: 200 },
+        msg: { type: 'string', example: '查询成功' },
+        data: {
+          type: 'object',
+          properties: {
+            creator_id: { type: 'string' },
+          },
+        },
+      },
+    },
+  })
+  async getCourseCreatorId(@Param('id') id: string) {
+    const data = await this.courseService.getCourseCreatorId(id);
     return Result.success('查询成功', data);
   }
 

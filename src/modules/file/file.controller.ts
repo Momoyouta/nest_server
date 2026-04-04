@@ -26,13 +26,17 @@ import { UploadImageDto } from './upload/dto/upload-image.dto';
 import { InitChunkDto } from './chunk/dto/init-chunk.dto';
 import { UploadChunkDto } from './chunk/dto/upload-chunk.dto';
 import { MergeChunkDto } from './chunk/dto/merge-chunk.dto';
+import { InitChunkUserDto } from './chunk/dto/init-chunk-user.dto';
+import { UploadChunkUserDto } from './chunk/dto/upload-chunk-user.dto';
+import { MergeChunkUserDto } from './chunk/dto/merge-chunk-user.dto';
 import { CreateSchoolDirDto } from './storage/dto/create-school-dir.dto';
 import { CreateCourseDirDto } from './storage/dto/create-course-dir.dto';
 import { CreateChapterLessonDirDto } from './storage/dto/create-chapter-lesson-dir.dto';
 import { CreateHomeworkDirDto } from './storage/dto/create-homework-dir.dto';
 import { FilePathMap, FilePathTemplate } from '@/common/utils/file-path.map';
-import { Public } from '@/common/decorators/auth.decorator';
+import { Public, AllJwtAuth } from '@/common/decorators/auth.decorator';
 import { AdminAuth } from '@/common/decorators/admin-auth.decorator';
+import { AdminRolesMap } from '@/common/utils/role.map';
 
 @ApiTags('文件上传与资源中心')
 @Controller('file')
@@ -42,7 +46,7 @@ export class FileController {
     private readonly chunkService: ChunkService,
     private readonly storageService: StorageService,
     private readonly cleanupTask: CleanupTask,
-  ) {}
+  ) { }
 
   // ===== 小文件上传 =====
   @Post('upload/image')
@@ -191,6 +195,75 @@ export class FileController {
   async manualCleanup() {
     const data = await this.cleanupTask.cleanExpiredChunks();
     return { code: 200, msg: '清理完成', data };
+  }
+
+  // ===== 分片上传（用户端）=====
+
+  @Post('chunk/user/init')
+  @Role(AdminRolesMap.teacher)
+  @ApiOperation({ summary: '用户端：初始化分片上传（校验课程创建者权限）' })
+  @ApiResponse({
+    status: 200,
+    description: '初始化成功，返回 uploadId 和已上传分片列表',
+  })
+  async initChunkUploadUser(@Body() dto: InitChunkUserDto) {
+    const data = await this.chunkService.initUploadUser(dto);
+    return { code: 200, msg: '初始化成功', data };
+  }
+
+  @Post('chunk/user/upload')
+  @Role(AdminRolesMap.teacher)
+  @ApiOperation({
+    summary: '用户端：上传单个分片（校验课程创建者权限）',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: '分片上传负载',
+    schema: {
+      type: 'object',
+      required: ['file', 'uploadId', 'chunkIndex', 'fileHash', 'scenario'],
+      properties: {
+        file: { type: 'string', format: 'binary', description: '分片文件' },
+        uploadId: { type: 'string', description: '上传任务ID' },
+        chunkIndex: { type: 'number', description: '分片索引（从0开始）' },
+        fileHash: { type: 'string', description: '文件MD5哈希値' },
+        scenario: { type: 'string', description: '上传场景' },
+        schoolId: { type: 'number', description: '学校ID（按需）' },
+        courseId: { type: 'number', description: '课程ID（必填，用于创建者校验）' },
+        homeworkId: { type: 'number', description: '作业ID（按需）' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: '分片上传成功' })
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadChunkUser(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: UploadChunkUserDto,
+  ) {
+    const data = await this.chunkService.uploadChunkUser(dto, file);
+    return { code: 200, msg: '分片上传成功', data };
+  }
+
+  @Get('chunk/user/progress/:fileHash')
+  @Role(AdminRolesMap.teacher)
+  @ApiOperation({ summary: '用户端：查询分片上传进度（校验教师身份）' })
+  @ApiParam({ name: 'fileHash', description: '文件MD5哈希値' })
+  @ApiResponse({ status: 200, description: '返回已上传分片列表和任务状态' })
+  async getChunkProgressUser(@Param('fileHash') fileHash: string) {
+    const data = await this.chunkService.getProgressUser(fileHash);
+    return { code: 200, msg: '查询成功', data };
+  }
+
+  @Post('chunk/user/merge')
+  @Role(AdminRolesMap.teacher)
+  @ApiOperation({ summary: '用户端：合并分片，生成最终文件（校验课程创建者权限）' })
+  @ApiResponse({
+    status: 200,
+    description: '合并成功，返回最终文件路径',
+  })
+  async mergeChunksUser(@Body() dto: MergeChunkUserDto) {
+    const data = await this.chunkService.mergeChunksUser(dto);
+    return { code: 200, msg: '合并成功', data };
   }
 
   // ===== 目录管理 =====

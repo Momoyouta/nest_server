@@ -33,17 +33,36 @@
 
 ```bash
 src/
-├── common/              # 公共资源（装饰器、过滤器、守卫、中间件、工具类）
-├── config/              # 配置文件与环境变量管理
-├── database/            # 数据库实体 (Entities) 与全局类型定义
-├── dto/                 # 全局 DTO 定义
-├── modules/             # 业务逻辑模块
-│   ├── auth/            # 身份认证模块
-│   ├── user/            # 用户管理模块
-│   ├── common/          # 通用业务模块
-│   └── async/           # AsyncLocalStorage 服务
+├── app.controller.ts    # 应用示例控制器
+├── app.module.ts        # 根模块
+├── app.service.ts       # 应用示例服务
 ├── main.ts              # 入口文件
-└── app.module.ts        # 根模块
+├── common/              # 公共资源
+│   ├── constants/       # 常量定义
+│   ├── decorators/      # 装饰器
+│   ├── dto/             # 通用 DTO
+│   ├── filters/         # 全局过滤器
+│   ├── guard/           # 守卫
+│   ├── middleware/      # 中间件
+│   └── utils/           # 工具与映射
+├── config/              # 配置文件与环境变量管理
+├── database/            # 数据库实体与全局类型定义
+│   ├── entities/        # TypeORM 实体
+│   └── types/           # 数据库相关类型
+├── dto/                 # 全局 DTO 定义
+└── modules/             # 业务模块
+    ├── async/           # AsyncLocalStorage 服务
+    ├── auth/            # 身份认证
+    ├── common/          # 通用业务接口
+    ├── course/          # 课程管理
+    ├── file/            # 文件上传与存储
+    ├── invitation/      # 邀请码与关联任务
+    ├── redis/           # Redis 模块
+    ├── school/          # 学校管理
+    ├── school_admin/    # 学校管理员管理
+    ├── student/         # 学生端业务
+    ├── teacher/         # 教师端业务
+    └── user/            # 用户管理
 ```
 
 ## 静态文件存储fileStore结构

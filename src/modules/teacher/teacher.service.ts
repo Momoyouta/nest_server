@@ -272,4 +272,32 @@ export class TeacherService {
   async createCourse(payload: any) {
     return this.courseService.createCourseUser(payload);
   }
+
+  async listTeachingGroup(query: any) {
+    return this.courseService.listTeachingGroupUser(query);
+  }
+
+  async getTeachingGroup(id: string) {
+    return this.courseService.getTeachingGroupUser(id);
+  }
+
+  async bindTeachingGroupTeachers(payload: any) {
+    return this.courseService.bindTeachingGroupTeachersUser(payload);
+  }
+
+  async querySchoolTeacherByName(query: any) {
+    return this.courseService.querySchoolTeacherByNameUser(query);
+  }
+
+  async createTeachingGroup(payload: any) {
+    return this.courseService.createTeachingGroupUser(payload);
+  }
+
+  async updateTeachingGroup(payload: any) {
+    return this.courseService.updateTeachingGroupUser(payload);
+  }
+
+  async deleteTeachingGroup(id: string) {
+    return this.courseService.deleteTeachingGroupUser(id);
+  }
 }

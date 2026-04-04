@@ -22,7 +22,7 @@ import { SchoolAdmin } from '@/database/entities/school_admin.entity';
 import { School } from '@/database/entities/school.entity';
 import { Teacher } from '@/database/entities/teacher.entity';
 import { User } from '@/database/entities/user.entity';
-import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Not, Repository } from 'typeorm';
 import { v4 } from 'uuid';
 import {
   BindTeachingGroupTeachersAdminDto,
@@ -59,9 +59,10 @@ import {
   ListStudentCoursesQueryDto,
   ListMyCreatedCoursesQueryDto,
   CourseUserListResponseDto,
+  TeacherSimpleDto,
 } from '@/modules/course/dto/CourseAdmin.dto';
 import { CourseStatusMap } from '@/common/utils/course.map';
-import { PlatformAdminRoles, SchoolAdminRoles } from '@/common/utils/role.map';
+import { AdminRolesMap, PlatformAdminRoles, SchoolAdminRoles } from '@/common/utils/role.map';
 import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
 import { StorageService } from '../file/storage/storage.service';
 import {
@@ -178,6 +179,20 @@ export class CourseService {
       true,
     );
 
+    const roleIds = this.parseRoleIds(user);
+    const isSchoolAdmin = roleIds.some((roleId) =>
+      SchoolAdminRoles.includes(roleId),
+    );
+    let creatorId = user.id;
+    if (isSchoolAdmin) {
+      const schoolAdmin = await this.schoolAdminRepository.findOne({
+        where: { user_id: user.id },
+      });
+      if (schoolAdmin) {
+        creatorId = schoolAdmin.id;
+      }
+    }
+
     const saved = await this.dataSource.transaction(async (manager) => {
       const courseRepository = manager.getRepository(Course);
       const teachingGroupRepository =
@@ -185,7 +200,7 @@ export class CourseService {
 
       const course = courseRepository.create({
         school_id: schoolId,
-        creator_id: user.id,
+        creator_id: creatorId,
         name: payload.name,
         cover_img: payload.cover_img,
         description: payload.description,
@@ -232,9 +247,10 @@ export class CourseService {
 
       const course = courseRepository.create({
         school_id: teacher.school_id,
-        creator_id: user.id,
+        creator_id: teacher.id,
         name: payload.name,
         status: Number(CourseStatusMap.UNPUBLISHED),
+        description: '课程简介待编辑...'
       });
 
       const createdCourse = await courseRepository.save(course);
@@ -322,7 +338,7 @@ export class CourseService {
       },
     );
 
-    const teacherNamesMap = await this.getTeachingGroupTeacherNamesMap(
+    const teachersMap = await this.getTeachingGroupTeachersMap(
       rows.map((item) => item.id),
     );
     const invitationMetaMap = await this.getTeachingGroupInvitationMetaMap(
@@ -336,7 +352,7 @@ export class CourseService {
         id: item.id,
         course_id: item.course_id,
         name: item.name,
-        teachers: teacherNamesMap.get(item.id) || [],
+        teachers: teachersMap.get(item.id) || [],
         create_time: item.create_time,
         invitation_create_time: invitationMeta?.invitation_create_time ?? null,
         invitation_code: invitationMeta?.invitation_code ?? null,
@@ -358,7 +374,7 @@ export class CourseService {
       id,
       user,
     );
-    const teacherNamesMap = await this.getTeachingGroupTeacherNamesMap([
+    const teachersMap = await this.getTeachingGroupTeachersMap([
       teachingGroup.id,
     ]);
     const invitationMetaMap = await this.getTeachingGroupInvitationMetaMap(
@@ -371,7 +387,7 @@ export class CourseService {
       id: teachingGroup.id,
       course_id: teachingGroup.course_id,
       name: teachingGroup.name,
-      teachers: teacherNamesMap.get(teachingGroup.id) || [],
+      teachers: teachersMap.get(teachingGroup.id) || [],
       create_time: teachingGroup.create_time,
       invitation_create_time: invitationMeta?.invitation_create_time ?? null,
       invitation_ttl: invitationMeta?.invitation_ttl ?? null,
@@ -463,6 +479,9 @@ export class CourseService {
       }
 
       await groupTeacherRepository.delete({ group_id: teachingGroup.id });
+      await invitationCodeRepository.delete({
+        teaching_group_id: teachingGroup.id,
+      });
       await teachingGroupRepository.delete({ id: teachingGroup.id });
       await this.syncCourseTeachersFromGroups(course.id, manager);
     });
@@ -471,6 +490,230 @@ export class CourseService {
       id,
       deleted: true,
     };
+  }
+
+  async bindTeachingGroupTeachersUser(
+    payload: BindTeachingGroupTeachersAdminDto,
+  ): Promise<BindTeachingGroupTeachersAdminResponseDto> {
+    const user = await this.getCurrentUserOrThrow();
+    const { course, teachingGroup } =
+      await this.findTeachingGroupWithTeacherPermissionOrThrow(
+        payload.teaching_group_id,
+        user.id,
+      );
+
+    if (payload.course_id !== course.id) {
+      throw new BadRequestException('课程 ID 与教学组不匹配');
+    }
+
+    const teacherIds = this.normalizeTeacherIds(payload.teacher_ids);
+    if (teacherIds.length === 0) {
+      throw new BadRequestException('teacher_ids 不能为空');
+    }
+
+    const teachers = await this.teacherRepository.find({
+      select: ['id', 'school_id'],
+      where: { id: In(teacherIds) },
+    });
+    if (teachers.length !== teacherIds.length) {
+      throw new BadRequestException('teacher_ids 包含不存在教师');
+    }
+
+    const invalidSchoolTeacher = teachers.find(
+      (teacher) => teacher.school_id !== course.school_id,
+    );
+    if (invalidSchoolTeacher) {
+      throw new BadRequestException('teacher_ids 包含非本校教师');
+    }
+
+    const syncResult = await this.syncTeachingGroupTeachers({
+      courseId: course.id,
+      teachingGroupId: teachingGroup.id,
+      teacherIds,
+    });
+
+    return {
+      course_id: course.id,
+      teaching_group_id: teachingGroup.id,
+      teacher_ids: syncResult.teacher_ids,
+      updated: true,
+    };
+  }
+
+  async listTeachingGroupUser(
+    query: ListTeachingGroupAdminQueryDto,
+  ): Promise<ListTeachingGroupAdminResponseDto> {
+    const user = await this.getCurrentUserOrThrow();
+    const course = await this.findCourseWithTeacherPermissionOrThrow(
+      query.course_id,
+      user.id,
+    );
+
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 10;
+
+    const [rows, total] = await this.courseTeachingGroupRepository.findAndCount(
+      {
+        where: { course_id: course.id },
+        order: { create_time: 'DESC' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      },
+    );
+
+    const teachersMap = await this.getTeachingGroupTeachersMap(
+      rows.map((item) => item.id),
+    );
+    const invitationMetaMap = await this.getTeachingGroupInvitationMetaMap(
+      course.id,
+      rows.map((item) => item.id),
+    );
+
+    const list: TeachingGroupItemDto[] = rows.map((item) => {
+      const invitationMeta = invitationMetaMap.get(item.id);
+      return {
+        id: item.id,
+        course_id: item.course_id,
+        name: item.name,
+        teachers: teachersMap.get(item.id) || [],
+        create_time: item.create_time,
+        invitation_create_time: invitationMeta?.invitation_create_time ?? null,
+        invitation_code: invitationMeta?.invitation_code ?? null,
+        invitation_ttl: invitationMeta?.invitation_ttl ?? null,
+      };
+    });
+
+    return { list, total };
+  }
+
+  async getTeachingGroupUser(
+    id: string,
+  ): Promise<GetTeachingGroupAdminResponseDto> {
+    const user = await this.getCurrentUserOrThrow();
+    const { teachingGroup } =
+      await this.findTeachingGroupWithTeacherPermissionOrThrow(id, user.id);
+
+    const teachersMap = await this.getTeachingGroupTeachersMap([
+      teachingGroup.id,
+    ]);
+    const invitationMetaMap = await this.getTeachingGroupInvitationMetaMap(
+      teachingGroup.course_id,
+      [teachingGroup.id],
+    );
+    const invitationMeta = invitationMetaMap.get(teachingGroup.id);
+
+    return {
+      id: teachingGroup.id,
+      course_id: teachingGroup.course_id,
+      name: teachingGroup.name,
+      teachers: teachersMap.get(teachingGroup.id) || [],
+      create_time: teachingGroup.create_time,
+      invitation_create_time: invitationMeta?.invitation_create_time ?? null,
+      invitation_ttl: invitationMeta?.invitation_ttl ?? null,
+      invitation_code: invitationMeta?.invitation_code ?? null,
+    };
+  }
+
+  async createTeachingGroupUser(
+    payload: CreateTeachingGroupAdminDto,
+  ): Promise<CreateTeachingGroupAdminResponseDto> {
+    const user = await this.getCurrentUserOrThrow();
+    const course = await this.findCourseWithTeacherPermissionOrThrow(
+      payload.course_id,
+      user.id,
+    );
+
+    const name = String(payload.name || '').trim();
+    if (!name) {
+      throw new BadRequestException('教学组名称不能为空');
+    }
+
+    const duplicate = await this.courseTeachingGroupRepository.findOne({
+      where: { course_id: course.id, name },
+    });
+    if (duplicate) {
+      throw new BadRequestException('同课程下教学组名称已存在');
+    }
+
+    const teachingGroupId = v4();
+    const teachingGroup = this.courseTeachingGroupRepository.create({
+      id: teachingGroupId,
+      course_id: course.id,
+      name,
+    });
+    const saved = await this.courseTeachingGroupRepository.save(teachingGroup);
+
+    return {
+      id: saved.id,
+      course_id: saved.course_id,
+      name: saved.name,
+      teachers: [],
+    };
+  }
+
+  async updateTeachingGroupUser(
+    payload: UpdateTeachingGroupAdminDto,
+  ): Promise<UpdateTeachingGroupAdminResponseDto> {
+    const user = await this.getCurrentUserOrThrow();
+    const { course, teachingGroup } =
+      await this.findTeachingGroupWithTeacherPermissionOrThrow(
+        payload.teaching_group_id,
+        user.id,
+      );
+
+    const name = String(payload.name || '').trim();
+    if (!name) {
+      throw new BadRequestException('教学组名称不能为空');
+    }
+
+    const duplicate = await this.courseTeachingGroupRepository.findOne({
+      where: {
+        course_id: course.id,
+        name,
+        id: Not(teachingGroup.id),
+      },
+    });
+    if (duplicate) {
+      throw new BadRequestException('同课程下教学组名称已存在');
+    }
+
+    teachingGroup.name = name;
+    await this.courseTeachingGroupRepository.save(teachingGroup);
+
+    return {
+      id: teachingGroup.id,
+      updated: true,
+    };
+  }
+
+  async deleteTeachingGroupUser(
+    id: string,
+  ): Promise<DeleteTeachingGroupAdminResponseDto> {
+    const user = await this.getCurrentUserOrThrow();
+    const { course, teachingGroup } =
+      await this.findTeachingGroupWithTeacherPermissionOrThrow(id, user.id);
+
+    await this.dataSource.transaction(async (manager) => {
+      const teachingGroupRepository = manager.getRepository(CourseTeachingGroup);
+      const groupTeacherRepository = manager.getRepository(CourseGroupTeacher);
+      const invitationCodeRepository = manager.getRepository(InvitationCode);
+
+      const groupCount = await teachingGroupRepository.count({
+        where: { course_id: course.id },
+      });
+      if (groupCount <= 1) {
+        throw new BadRequestException('课程至少保留一个教学组，无法删除');
+      }
+
+      await groupTeacherRepository.delete({ group_id: teachingGroup.id });
+      await invitationCodeRepository.delete({
+        teaching_group_id: teachingGroup.id,
+      });
+      await teachingGroupRepository.delete({ id: teachingGroup.id });
+      await this.syncCourseTeachersFromGroups(course.id, manager);
+    });
+
+    return { id: teachingGroup.id, deleted: true };
   }
 
   async updateCourseCoverAdmin(
@@ -526,6 +769,28 @@ export class CourseService {
     return { id: course.id, updated: true };
   }
 
+  async updateCourseUser(
+    payload: UpdateCourseDto,
+  ): Promise<{ id: string; updated: true }> {
+    const user = await this.getCurrentUserOrThrow();
+    const course = await this.findCourseWithTeacherPermissionOrThrow(payload.id, user.id);
+
+    if (payload.name !== undefined) {
+      course.name = payload.name;
+    }
+    if (payload.cover_img !== undefined) {
+      course.cover_img = payload.cover_img;
+    }
+    if (payload.status !== undefined) {
+      course.status = payload.status;
+    }
+    if (payload.description !== undefined) {
+      course.description = payload.description;
+    }
+    await this.courseRepository.save(course);
+    return { id: course.id, updated: true };
+  }
+
   async saveCourseDraftAdmin(
     payload: SaveCourseDraftDto,
   ): Promise<SaveCourseDraftResponseDto> {
@@ -533,6 +798,28 @@ export class CourseService {
     const course = await this.findCourseWithPermissionOrThrow(
       payload.course_id,
       user,
+    );
+    this.validateDraftAgainstCourse(payload.draft_content, course);
+
+    course.draft_content = payload.draft_content as unknown as Record<
+      string,
+      unknown
+    >;
+    await this.courseRepository.save(course);
+
+    return {
+      course_id: course.id,
+      updated: true,
+    };
+  }
+
+  async saveCourseDraftUser(
+    payload: SaveCourseDraftDto,
+  ): Promise<SaveCourseDraftResponseDto> {
+    const user = await this.getCurrentUserOrThrow();
+    const course = await this.findCourseWithTeacherPermissionOrThrow(
+      payload.course_id,
+      user.id,
     );
     this.validateDraftAgainstCourse(payload.draft_content, course);
 
@@ -907,6 +1194,49 @@ export class CourseService {
     };
   }
 
+  async querySchoolTeacherByNameUser(
+    query: QuerySchoolTeacherByNameAdminDto,
+  ): Promise<QuerySchoolTeacherByNameAdminResponseDto> {
+    const user = await this.getCurrentUserOrThrow();
+    const teacher = await this.teacherRepository.findOne({
+      where: { user_id: user.id },
+    });
+    if (!teacher) {
+      throw new ForbiddenException('仅教师可查询');
+    }
+
+    const schoolId = teacher.school_id;
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 10;
+    const keyword = String(query.name || '').trim();
+    if (!keyword) {
+      throw new BadRequestException('name 不能为空');
+    }
+
+    const qb = this.teacherRepository
+      .createQueryBuilder('teacher')
+      .innerJoin(User, 'user', 'user.id = teacher.user_id')
+      .select('teacher.id', 'id')
+      .addSelect('user.name', 'name')
+      .where('teacher.school_id = :schoolId', { schoolId })
+      .andWhere('user.name LIKE :name', { name: `${keyword}%` });
+
+    const total = await qb.getCount();
+    const rows = await qb
+      .orderBy('user.name', 'ASC')
+      .offset((page - 1) * pageSize)
+      .limit(pageSize)
+      .getRawMany<TeacherSimpleRowRaw>();
+
+    return {
+      list: rows.map((item) => ({
+        id: String(item.id),
+        name: String(item.name || ''),
+      })),
+      total,
+    };
+  }
+
   async getCourseLessonOutline(
     id: string,
     source?: string,
@@ -917,15 +1247,31 @@ export class CourseService {
     }
 
     const platform = this.alsService.getStore()?.platform;
-    const adminSource: CourseOutlineSource =
-      source === CourseOutlineSourceMap.PUBLISHED
-        ? CourseOutlineSourceMap.PUBLISHED
-        : CourseOutlineSourceMap.DRAFT;
+    let shouldShowDraft = false;
 
-    if (
-      platform === 'admin' &&
-      adminSource !== CourseOutlineSourceMap.PUBLISHED
-    ) {
+    if (platform === 'admin') {
+      const adminSource: CourseOutlineSource =
+        source === CourseOutlineSourceMap.PUBLISHED
+          ? CourseOutlineSourceMap.PUBLISHED
+          : CourseOutlineSourceMap.DRAFT;
+      shouldShowDraft = adminSource !== CourseOutlineSourceMap.PUBLISHED;
+    } else {
+      // 教师用户端如果是该课程创作人，则返回草稿
+      const userId = this.alsService.getUserId();
+      if (userId) {
+        const user = await this.userRepository.findOneBy({ id: userId });
+        if (user && this.parseRoleIds(user).includes(AdminRolesMap.teacher)) {
+          const teacher = await this.teacherRepository.findOne({
+            where: { user_id: user.id },
+          });
+          if (teacher && course.creator_id === teacher.id) {
+            shouldShowDraft = true;
+          }
+        }
+      }
+    }
+
+    if (shouldShowDraft) {
       const draft = this.parseDraftContent(course.draft_content);
       if (draft) {
         return this.normalizeOutlineDraft(draft, course);
@@ -1097,44 +1443,60 @@ export class CourseService {
     }
 
     const courseIds = courseRows.map((item) => item.id);
-
+    const teachersMap = new Map<string, TeacherSimpleDto[]>();
     const teacherRows = await this.courseTeacherRepository
       .createQueryBuilder('ct')
       .innerJoin(Teacher, 'teacher', 'teacher.id = ct.teacher_id')
       .innerJoin(User, 'user', 'user.id = teacher.user_id')
       .select('ct.course_id', 'course_id')
+      .addSelect('teacher.id', 'teacher_id')
       .addSelect('user.name', 'teacher_name')
       .where('ct.course_id IN (:...courseIds)', { courseIds })
-      .getRawMany<TeacherNameRowRaw>();
+      .getRawMany<any>();
+
+    teacherRows.forEach((row) => {
+      const courseId = String(row.course_id);
+      if (!teachersMap.has(courseId)) {
+        teachersMap.set(courseId, []);
+      }
+      const list = teachersMap.get(courseId)!;
+      if (!list.find(t => t.id === String(row.teacher_id))) {
+        list.push({ id: String(row.teacher_id), name: String(row.teacher_name) });
+      }
+    });
 
     const creatorIds = courseRows
       .map((item) => item.creator_id)
       .filter((item) => Boolean(item));
-    const creatorUsers =
-      creatorIds.length > 0
-        ? await this.userRepository.find({
-          select: ['id', 'name'],
-          where: { id: In(creatorIds) },
-        })
-        : [];
 
-    const teacherNamesMap = new Map<string, Set<string>>();
-    teacherRows.forEach((item) => {
-      const courseId = String(item.course_id);
-      const teacherName = String(item.teacher_name || '').trim();
-      if (!teacherName) {
-        return;
-      }
-      if (!teacherNamesMap.has(courseId)) {
-        teacherNamesMap.set(courseId, new Set());
-      }
-      teacherNamesMap.get(courseId)?.add(teacherName);
-    });
+    // 1. 从 User 表查 (针对平台管理员)
+    const creatorUsers = creatorIds.length > 0 ? await this.userRepository.find({
+      select: ['id', 'name'],
+      where: { id: In(creatorIds) },
+    }) : [];
+
+    // 2. 从 Teacher 表 (+ User) 查
+    const creatorTeachers = creatorIds.length > 0 ? await this.teacherRepository
+      .createQueryBuilder('t')
+      .innerJoin(User, 'u', 'u.id = t.user_id')
+      .select('t.id', 'id')
+      .addSelect('u.name', 'name')
+      .where('t.id IN (:...creatorIds)', { creatorIds })
+      .getRawMany() : [];
+
+    // 3. 从 SchoolAdmin 表 (+ User) 查
+    const creatorSchoolAdmins = creatorIds.length > 0 ? await this.schoolAdminRepository
+      .createQueryBuilder('sa')
+      .innerJoin(User, 'u', 'u.id = sa.user_id')
+      .select('sa.id', 'id')
+      .addSelect('u.name', 'name')
+      .where('sa.id IN (:...creatorIds)', { creatorIds })
+      .getRawMany() : [];
 
     const creatorNameMap = new Map<string, string>();
-    creatorUsers.forEach((item) => {
-      creatorNameMap.set(item.id, item.name);
-    });
+    creatorUsers.forEach((item) => creatorNameMap.set(item.id, item.name));
+    creatorTeachers.forEach((item) => creatorNameMap.set(String(item.id), String(item.name)));
+    creatorSchoolAdmins.forEach((item) => creatorNameMap.set(String(item.id), String(item.name)));
 
     const list: CourseListItemDto[] = courseRows.map((row) => {
       const rowCourseId = String(row.id);
@@ -1148,7 +1510,7 @@ export class CourseService {
         status: Number(row.status),
         create_time: row.create_time ? String(row.create_time) : undefined,
         update_time: row.update_time ? String(row.update_time) : undefined,
-        teacher_names: Array.from(teacherNamesMap.get(rowCourseId) || []),
+        teacher_names: teachersMap.get(rowCourseId) || [],
         creator_name: creatorNameMap.get(String(row.creator_id)),
       };
     });
@@ -1179,7 +1541,10 @@ export class CourseService {
         'school.name AS school_name',
         'cgt.group_id AS group_id',
       ])
-      .where('cgt.teacher_id = :teacherId', { teacherId: query.teacher_id });
+      .where('cgt.teacher_id = :teacherId', { teacherId: query.teacher_id })
+      .andWhere('course.status = :status', {
+        status: CourseStatusMap.PUBLISHED,
+      });
 
     if (query.school_id) {
       baseQb.andWhere('course.school_id = :schoolId', {
@@ -1199,7 +1564,7 @@ export class CourseService {
     }
 
     const groupIds = rows.map((row) => row.group_id);
-    const teacherNamesMap = await this.getTeachingGroupTeacherNamesMap(groupIds);
+    const teachersMap = await this.getTeachingGroupTeachersMap(groupIds);
 
     const list = rows.map((row) => ({
       course_id: String(row.course_id),
@@ -1212,7 +1577,7 @@ export class CourseService {
       update_time: row.update_time ? String(row.update_time) : undefined,
       school_name: String(row.school_name || ''),
       group_id: String(row.group_id),
-      teacher_names: teacherNamesMap.get(row.group_id) || [],
+      teacher_names: teachersMap.get(String(row.group_id)) || [],
     }));
 
     return { list, total };
@@ -1224,6 +1589,11 @@ export class CourseService {
   ): Promise<CourseUserListResponseDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 10;
+
+    const teacher = await this.teacherRepository.findOne({
+      where: { user_id: userId },
+    });
+    const realCreatorId = teacher ? teacher.id : userId;
 
     const baseQb = this.courseRepository
       .createQueryBuilder('course')
@@ -1239,7 +1609,7 @@ export class CourseService {
         'course.update_time AS update_time',
         'school.name AS school_name',
       ])
-      .where('course.creator_id = :userId', { userId });
+      .where('course.creator_id = :creatorId', { creatorId: realCreatorId });
 
     if (query.school_id) {
       baseQb.andWhere('course.school_id = :schoolId', {
@@ -1279,23 +1649,30 @@ export class CourseService {
       }
     });
 
-    // 获取所有任课老师姓名列表 (不分教学组)
+    // 获取所有任课老师列表 (不分教学组)
     const teacherRows = await this.courseTeacherRepository
       .createQueryBuilder('ct')
       .innerJoin(Teacher, 'teacher', 'teacher.id = ct.teacher_id')
       .innerJoin(User, 'user', 'user.id = teacher.user_id')
       .select('ct.course_id', 'course_id')
+      .addSelect('teacher.id', 'teacher_id')
       .addSelect('user.name', 'teacher_name')
       .where('ct.course_id IN (:...courseIds)', { courseIds })
-      .getRawMany<TeacherNameRowRaw>();
+      .getRawMany<any>();
 
-    const teacherNamesMap = new Map<string, string[]>();
+    const courseTeachersMap = new Map<string, TeacherSimpleDto[]>();
     teacherRows.forEach((row) => {
       const courseId = String(row.course_id);
-      if (!teacherNamesMap.has(courseId)) {
-        teacherNamesMap.set(courseId, []);
+      if (!courseTeachersMap.has(courseId)) {
+        courseTeachersMap.set(courseId, []);
       }
-      teacherNamesMap.get(courseId)?.push(String(row.teacher_name));
+      const teachers = courseTeachersMap.get(courseId)!;
+      if (!teachers.find(t => t.id === String(row.teacher_id))) {
+        teachers.push({
+          id: String(row.teacher_id),
+          name: String(row.teacher_name),
+        });
+      }
     });
 
     const list = rows.map((row) => ({
@@ -1309,7 +1686,7 @@ export class CourseService {
       update_time: row.update_time ? String(row.update_time) : undefined,
       school_name: String(row.school_name || ''),
       group_id: courseGroupMap.get(row.course_id) || '',
-      teacher_names: Array.from(new Set(teacherNamesMap.get(row.course_id) || [])),
+      teacher_names: courseTeachersMap.get(row.course_id) || [],
     }));
 
     return { list, total };
@@ -1360,10 +1737,10 @@ export class CourseService {
       .map((row) => row.group_id)
       .filter((id) => Boolean(id));
 
-    const teacherNamesMap =
+    const teachersMap =
       groupIds.length > 0
-        ? await this.getTeachingGroupTeacherNamesMap(groupIds)
-        : new Map<string, string[]>();
+        ? await this.getTeachingGroupTeachersMap(groupIds)
+        : new Map<string, TeacherSimpleDto[]>();
 
     const list = rows.map((row) => ({
       course_id: String(row.course_id),
@@ -1376,7 +1753,7 @@ export class CourseService {
       update_time: row.update_time ? String(row.update_time) : undefined,
       school_name: String(row.school_name || ''),
       group_id: String(row.group_id || ''),
-      teacher_names: row.group_id ? teacherNamesMap.get(row.group_id) || [] : [],
+      teacher_names: row.group_id ? teachersMap.get(row.group_id) || [] : [],
     }));
 
     return { list, total };
@@ -1391,33 +1768,61 @@ export class CourseService {
       where: { id: course.school_id },
     });
 
-    const creator = await this.userRepository.findOne({
+    // 解析 creator_name，支持 user.id, teacher.id, school_admin.id
+    let creatorName = '';
+    const creatorId = course.creator_id;
+
+    // 1. 尝试从 User 表找 (平台管理员)
+    const userCreator = await this.userRepository.findOne({
       select: ['name'],
-      where: { id: course.creator_id },
+      where: { id: creatorId },
     });
+    if (userCreator) {
+      creatorName = userCreator.name;
+    } else {
+      // 2. 尝试从 Teacher 表找
+      const teacherCreator = await this.teacherRepository
+        .createQueryBuilder('t')
+        .innerJoin(User, 'u', 'u.id = t.user_id')
+        .select('u.name', 'name')
+        .where('t.id = :creatorId', { creatorId })
+        .getRawOne();
+      if (teacherCreator) {
+        creatorName = teacherCreator.name;
+      } else {
+        // 3. 尝试从 SchoolAdmin 表找
+        const schoolAdminCreator = await this.schoolAdminRepository
+          .createQueryBuilder('sa')
+          .innerJoin(User, 'u', 'u.id = sa.user_id')
+          .select('u.name', 'name')
+          .where('sa.id = :creatorId', { creatorId })
+          .getRawOne();
+        if (schoolAdminCreator) {
+          creatorName = schoolAdminCreator.name;
+        }
+      }
+    }
 
     const teacherRows = await this.courseTeacherRepository
       .createQueryBuilder('ct')
       .innerJoin(Teacher, 'teacher', 'teacher.id = ct.teacher_id')
       .innerJoin(User, 'user', 'user.id = teacher.user_id')
-      .select('user.name', 'teacher_name')
+      .select('teacher.id', 'teacher_id')
+      .addSelect('user.name', 'teacher_name')
       .where('ct.course_id = :courseId', { courseId: course.id })
-      .getRawMany<{ teacher_name: string | null }>();
+      .getRawMany<any>();
 
-    const teacher_names = Array.from(
-      new Set(
-        teacherRows
-          .map((item) => String(item.teacher_name || '').trim())
-          .filter((item) => item.length > 0),
-      ),
-    );
+    const teacher_names: TeacherSimpleDto[] = teacherRows.map((item) => ({
+      id: String(item.teacher_id),
+      name: String(item.teacher_name || '').trim(),
+    }));
 
     return {
       id: course.id,
       school_id: course.school_id,
       school_name: school?.name || '',
       creator_id: course.creator_id,
-      creator_name: creator?.name,
+      creator_name: creatorName,
       name: course.name,
       cover_img: course.cover_img,
       status: Number(course.status),
@@ -1438,9 +1843,20 @@ export class CourseService {
     return { description: course.description || '' };
   }
 
-  private async getTeachingGroupTeacherNamesMap(
+  async getCourseCreatorId(id: string): Promise<{ creator_id: string }> {
+    const course = await this.courseRepository.findOne({
+      select: ['creator_id'],
+      where: { id },
+    });
+    if (!course) {
+      throw new NotFoundException('课程不存在');
+    }
+    return { creator_id: course.creator_id };
+  }
+
+  private async getTeachingGroupTeachersMap(
     groupIds: string[],
-  ): Promise<Map<string, string[]>> {
+  ): Promise<Map<string, TeacherSimpleDto[]>> {
     if (groupIds.length === 0) {
       return new Map();
     }
@@ -1450,28 +1866,26 @@ export class CourseService {
       .innerJoin(Teacher, 'teacher', 'teacher.id = cgt.teacher_id')
       .innerJoin(User, 'user', 'user.id = teacher.user_id')
       .select('cgt.group_id', 'group_id')
+      .addSelect('teacher.id', 'teacher_id')
       .addSelect('user.name', 'teacher_name')
       .where('cgt.group_id IN (:...groupIds)', { groupIds })
-      .getRawMany<GroupTeacherNameRowRaw>();
+      .getRawMany<any>();
 
-    const nameSetMap = new Map<string, Set<string>>();
+    const teacherMap = new Map<string, TeacherSimpleDto[]>();
     rows.forEach((item) => {
       const groupId = String(item.group_id || '').trim();
+      const teacherId = String(item.teacher_id || '').trim();
       const teacherName = String(item.teacher_name || '').trim();
-      if (!groupId || !teacherName) {
+      if (!groupId || !teacherId || !teacherName) {
         return;
       }
-      if (!nameSetMap.has(groupId)) {
-        nameSetMap.set(groupId, new Set<string>());
+      if (!teacherMap.has(groupId)) {
+        teacherMap.set(groupId, []);
       }
-      nameSetMap.get(groupId)?.add(teacherName);
+      teacherMap.get(groupId)?.push({ id: teacherId, name: teacherName });
     });
 
-    const result = new Map<string, string[]>();
-    nameSetMap.forEach((value, key) => {
-      result.set(key, Array.from(value));
-    });
-    return result;
+    return teacherMap;
   }
 
   private async getTeachingGroupInvitationMetaMap(
@@ -1999,5 +2413,49 @@ export class CourseService {
       course,
       teachingGroup,
     };
+  }
+
+  private async findCourseWithTeacherPermissionOrThrow(
+    courseId: string,
+    userId: string,
+  ): Promise<Course> {
+    const teacher = await this.teacherRepository.findOne({
+      where: { user_id: userId },
+    });
+    if (!teacher) {
+      throw new ForbiddenException('仅教师可操作');
+    }
+
+    const course = await this.courseRepository.findOne({
+      where: { id: courseId },
+    });
+    if (!course) {
+      throw new NotFoundException('课程不存在');
+    }
+
+    if (course.creator_id !== teacher.id) {
+      throw new ForbiddenException('仅课程创建者可操作教学组');
+    }
+
+    return course;
+  }
+
+  private async findTeachingGroupWithTeacherPermissionOrThrow(
+    groupId: string,
+    userId: string,
+  ): Promise<{ course: Course; teachingGroup: CourseTeachingGroup }> {
+    const teachingGroup = await this.courseTeachingGroupRepository.findOne({
+      where: { id: groupId },
+    });
+    if (!teachingGroup) {
+      throw new NotFoundException('教学组不存在');
+    }
+
+    const course = await this.findCourseWithTeacherPermissionOrThrow(
+      teachingGroup.course_id,
+      userId,
+    );
+
+    return { course, teachingGroup };
   }
 }

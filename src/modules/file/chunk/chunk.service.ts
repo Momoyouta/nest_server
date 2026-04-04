@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -17,13 +18,24 @@ import {
   getFileStoreRoot,
 } from '@/common/utils/file-path.map';
 import { UploadService } from '../upload/upload.service';
+import { Teacher } from '@/database/entities/teacher.entity';
+import { Course } from '@/database/entities/course.entity';
+import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
+import { InitChunkUserDto } from './dto/init-chunk-user.dto';
+import { UploadChunkUserDto } from './dto/upload-chunk-user.dto';
+import { MergeChunkUserDto } from './dto/merge-chunk-user.dto';
 
 @Injectable()
 export class ChunkService {
   constructor(
     @InjectRepository(FileChunk)
     private readonly chunkRepo: Repository<FileChunk>,
+    @InjectRepository(Teacher)
+    private readonly teacherRepository: Repository<Teacher>,
+    @InjectRepository(Course)
+    private readonly courseRepository: Repository<Course>,
     private readonly uploadService: UploadService,
+    private readonly alsService: AsyncLocalstorageService,
   ) {}
 
   /**
@@ -217,6 +229,65 @@ export class ChunkService {
       });
       throw error;
     }
+  }
+
+  // ===== 用户端方法（校验 teacher_id 与 course.creator_id）=====
+
+  /**
+   * 校验当前登录用户是否为课程创建者
+   * @param courseId 课程 ID（来自 DTO，undefined 则跳过课程校验）
+   */
+  private async validateCourseOwnership(courseId?: string): Promise<void> {
+    const userId = this.alsService.getUserId();
+    if (!userId) {
+      throw new ForbiddenException('未登录');
+    }
+
+    const teacher = await this.teacherRepository.findOne({
+      where: { user_id: userId },
+    });
+    if (!teacher) {
+      throw new ForbiddenException('仅教师可操作');
+    }
+
+    if (courseId !== undefined && courseId !== null) {
+      const course = await this.courseRepository.findOne({
+        where: { id: courseId },
+      });
+      if (!course) {
+        throw new NotFoundException('课程不存在');
+      }
+      if (course.creator_id !== teacher.id) {
+        throw new ForbiddenException('仅课程创建者可上传课程资源');
+      }
+    }
+  }
+
+  /** 用户端：初始化分片上传（需校验为课程创建者） */
+  async initUploadUser(dto: InitChunkUserDto): Promise<ReturnType<ChunkService['initUpload']>> {
+    await this.validateCourseOwnership(dto.courseId);
+    return this.initUpload(dto);
+  }
+
+  /** 用户端：上传单个分片（需校验为课程创建者） */
+  async uploadChunkUser(
+    dto: UploadChunkUserDto,
+    file: Express.Multer.File,
+  ): Promise<ReturnType<ChunkService['uploadChunk']>> {
+    await this.validateCourseOwnership(dto.courseId);
+    return this.uploadChunk(dto as any, file);
+  }
+
+  /** 用户端：查询分片进度（仅校验教师身份） */
+  async getProgressUser(fileHash: string): Promise<ReturnType<ChunkService['getProgress']>> {
+    await this.validateCourseOwnership();
+    return this.getProgress(fileHash);
+  }
+
+  /** 用户端：合并分片（需校验为课程创建者） */
+  async mergeChunksUser(dto: MergeChunkUserDto): Promise<ReturnType<ChunkService['mergeChunks']>> {
+    await this.validateCourseOwnership(dto.courseId);
+    return this.mergeChunks(dto as any);
   }
 
   /**

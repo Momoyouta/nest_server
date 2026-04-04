@@ -19,6 +19,14 @@ import {
   CourseOutlineSourceValues,
 } from '@/common/utils/course-outline.map';
 
+export class TeacherSimpleDto {
+  @ApiProperty({ description: '教师ID' })
+  id: string;
+
+  @ApiProperty({ description: '教师姓名' })
+  name: string;
+}
+
 export class CreateCourseDto {
   @ApiProperty({ description: '课程名称', example: '高等数学一' })
   @IsString()
@@ -356,11 +364,10 @@ export class TeachingGroupItemDto {
   name: string;
 
   @ApiProperty({
-    description: '教学组内教师姓名列表',
-    type: [String],
-    example: ['张三'],
+    description: '教学组内教师列表',
+    type: [TeacherSimpleDto],
   })
-  teachers: string[];
+  teachers: TeacherSimpleDto[];
 
   @ApiPropertyOptional({ description: '创建时间戳(s)' })
   create_time?: string;
@@ -434,12 +441,11 @@ export class CourseListItemDto {
   school_name: string;
 
   @ApiProperty({
-    description: '任课老师姓名列表',
-    type: [String],
-    example: ['张三', '李四'],
+    description: '任课老师列表',
+    type: [TeacherSimpleDto],
   })
   @IsArray()
-  teacher_names: string[];
+  teacher_names: TeacherSimpleDto[];
 
   @ApiPropertyOptional({ description: '创建者姓名', example: '王老师' })
   creator_name?: string;
@@ -573,12 +579,11 @@ export class CourseUserListItemDto {
   group_id: string;
 
   @ApiProperty({
-    description: '对应教学组任课老师姓名列表',
-    type: [String],
-    example: ['张三', '李四'],
+    description: '对应教学组任课老师列表',
+    type: [TeacherSimpleDto],
   })
   @IsArray()
-  teacher_names: string[];
+  teacher_names: TeacherSimpleDto[];
 }
 
 export class CourseUserListResponseDto {
@@ -843,12 +848,11 @@ export class CourseBasicResponseDto {
   update_time?: string;
 
   @ApiProperty({
-    description: '任课老师姓名列表',
-    type: [String],
-    example: ['张三', '李四'],
+    description: '任课老师列表',
+    type: [TeacherSimpleDto],
   })
   @IsArray()
-  teacher_names: string[];
+  teacher_names: TeacherSimpleDto[];
 }
 
 export class CreateCourseResponseDto {
