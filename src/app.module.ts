@@ -14,6 +14,7 @@ import { SchoolModule } from './modules/school/school.module';
 import { StudentModule } from './modules/student/student.module';
 import { TeacherModule } from './modules/teacher/teacher.module';
 import { SchoolAdminModule } from './modules/school_admin/school_admin.module';
+import { FileAdminModule } from './modules/file_admin/file_admin.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { InvitationModule } from './modules/invitation/invitation.module';
 import { FileModule } from './modules/file/file.module';
@@ -50,6 +51,7 @@ const isDevEnv = (process.env.NODE_ENV || 'dev') === 'dev';
     StudentModule,
     TeacherModule,
     SchoolAdminModule,
+    FileAdminModule,
     RedisModule,
     InvitationModule,
     FileModule,

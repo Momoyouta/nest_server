@@ -19,7 +19,11 @@ import {
 import { AdminAuth } from '@/common/decorators/admin-auth.decorator';
 import { AllJwtAuth } from '@/common/decorators/auth.decorator';
 import { Role } from '@/common/decorators/role.decorator';
-import { AdminRoles, AdminRolesMap, AdminRoleValues } from '@/common/utils/role.map';
+import {
+  AdminRoles,
+  AdminRolesMap,
+  AdminRoleValues,
+} from '@/common/utils/role.map';
 import { Result } from '@/database/types/result.type';
 import {
   BindTeachingGroupTeachersAdminDto,
@@ -74,7 +78,7 @@ export class CourseController {
   constructor(
     private readonly courseService: CourseService,
     private readonly invitationService: InvitationService,
-  ) { }
+  ) {}
 
   @Post('createCourseAdmin')
   @AdminAuth()
@@ -183,7 +187,8 @@ export class CourseController {
   @Put('updateCourse')
   @Role(AdminRolesMap.teacher)
   @ApiOperation({
-    summary: '教师用户端更新课程（仅课程创建者，校验 teacher_id 与 course.creator_id）',
+    summary:
+      '教师用户端更新课程（仅课程创建者，校验 teacher_id 与 course.creator_id）',
   })
   @ApiBody({ type: UpdateCourseDto })
   @ApiResponse({
@@ -583,9 +588,7 @@ export class CourseController {
     status: 200,
     description: '同步成功',
   })
-  async syncLearningProgress(
-    @Body() payload: SyncProgressDto,
-  ) {
+  async syncLearningProgress(@Body() payload: SyncProgressDto) {
     const data = await this.courseService.syncLearningProgress(payload);
     return Result.success('同步成功', data);
   }

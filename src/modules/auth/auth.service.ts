@@ -80,9 +80,8 @@ export class AuthService {
     registerUserDto.phone = registerUserDto.account;
 
     // 3. 校验邀请码
-    const inviteData = await this.invitationService.getInviteDataPreferRedis(
-      inviteCode,
-    );
+    const inviteData =
+      await this.invitationService.getInviteDataPreferRedis(inviteCode);
     if (!inviteData) {
       throw new HttpException('邀请码不存在或已过期', HttpStatus.BAD_REQUEST);
     }

@@ -33,7 +33,7 @@ export class StudentController {
     private readonly studentService: StudentService,
     private readonly alsService: AsyncLocalstorageService,
     private readonly userService: UserService,
-  ) { }
+  ) {}
 
   @Get()
   @AdminAuth()

@@ -27,4 +27,14 @@ export class InitChunkDto {
   @IsNumber()
   @IsPositive()
   totalChunks: number;
+
+  @ApiProperty({ description: '文件类型 (1: 视频, 2: 普通文件)', example: 1 })
+  @IsNumber()
+  @IsNotEmpty()
+  type: number;
+
+  @ApiProperty({ description: '学校ID', example: '1' })
+  @IsString()
+  @IsNotEmpty()
+  schoolId: string;
 }

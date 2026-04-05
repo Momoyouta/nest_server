@@ -19,7 +19,7 @@ export class AuthGuard implements CanActivate {
     private readonly jwtService: JwtService,
     private reflector: Reflector,
     private alsService: AsyncLocalstorageService,
-  ) { }
+  ) {}
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
     const isPublic = this.reflector.getAllAndOverride<boolean>(API_PUBLIC, [
@@ -88,7 +88,6 @@ export class AuthGuard implements CanActivate {
             }
             if (roleIds) {
               context.roleIds = payload.roleIds;
-
             }
           }
           return true;

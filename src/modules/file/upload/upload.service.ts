@@ -8,6 +8,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { getFileStoreRoot } from '@/common/utils/file-path.map';
 import { FileUploadScenario } from '@/common/utils/file-scenario.map';
+import { FileType } from '@/common/utils/file-type.map';
 
 const ALLOWED_MIME_TYPES = [
   'image/jpeg',
@@ -28,6 +29,7 @@ export class UploadService {
     schoolId?: number;
     courseId?: number;
     homeworkId?: number;
+    type?: number;
   }): string {
     switch (dto.scenario) {
       case FileUploadScenario.AVATAR:
@@ -57,6 +59,9 @@ export class UploadService {
         }
         return `schools/${dto.schoolId}/courses/${dto.courseId}/documents`;
       case FileUploadScenario.TEMP_VIDEO:
+        if (dto.type === FileType.NORMAL) {
+          return 'uploads/temp';
+        }
         return 'uploads/temp/videos';
 
       default:

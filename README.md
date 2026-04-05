@@ -82,7 +82,6 @@ src/
 |       ├── private\                 # 私有文件（证明等
 │       └── courses\                 # 课程数据
 │           └── {course_id}\
-|               ├── documents\       # 课程资料
 |               ├── images\         # 图片资源
 |               |   └── banner.png     
 │               └── homework\        # 🚀 学生作业提交（不可共享，强绑定课程）

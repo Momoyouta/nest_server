@@ -46,7 +46,7 @@ export class FileController {
     private readonly chunkService: ChunkService,
     private readonly storageService: StorageService,
     private readonly cleanupTask: CleanupTask,
-  ) { }
+  ) {}
 
   // ===== 小文件上传 =====
   @Post('upload/image')
@@ -229,7 +229,10 @@ export class FileController {
         fileHash: { type: 'string', description: '文件MD5哈希値' },
         scenario: { type: 'string', description: '上传场景' },
         schoolId: { type: 'number', description: '学校ID（按需）' },
-        courseId: { type: 'number', description: '课程ID（必填，用于创建者校验）' },
+        courseId: {
+          type: 'number',
+          description: '课程ID（必填，用于创建者校验）',
+        },
         homeworkId: { type: 'number', description: '作业ID（按需）' },
       },
     },
@@ -256,7 +259,9 @@ export class FileController {
 
   @Post('chunk/user/merge')
   @Role(AdminRolesMap.teacher)
-  @ApiOperation({ summary: '用户端：合并分片，生成最终文件（校验课程创建者权限）' })
+  @ApiOperation({
+    summary: '用户端：合并分片，生成最终文件（校验课程创建者权限）',
+  })
   @ApiResponse({
     status: 200,
     description: '合并成功，返回最终文件路径',

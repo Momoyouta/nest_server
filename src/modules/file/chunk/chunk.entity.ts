@@ -45,6 +45,26 @@ export class FileChunk {
   @Column({ name: 'target_path', type: 'varchar', length: 500, nullable: true })
   targetPath: string | null;
 
+  @ApiProperty({
+    description: '文件类型 (1: 视频, 2: 普通文件)',
+    example: 1,
+    nullable: true,
+  })
+  @Column({ name: 'type', type: 'smallint', nullable: true })
+  type: number;
+
+  @ApiProperty({
+    description: '创建者ID',
+    example: 'uuid-v4-string',
+    nullable: true,
+  })
+  @Column({ name: 'creator_id', type: 'varchar', length: 255, nullable: true })
+  creatorId: string;
+
+  @ApiProperty({ description: '学校ID', example: '1', nullable: true })
+  @Column({ name: 'school_id', type: 'varchar', length: 255, nullable: true })
+  schoolId: string;
+
   @ApiProperty({ description: '创建时间', example: '2026-03-27T00:00:00.000Z' })
   @Column({
     name: 'create_time',

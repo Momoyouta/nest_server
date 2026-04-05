@@ -391,7 +391,7 @@ export class TeachingGroupItemDto {
   invitation_ttl?: number | null;
 }
 
-export class GetTeachingGroupAdminResponseDto extends TeachingGroupItemDto { }
+export class GetTeachingGroupAdminResponseDto extends TeachingGroupItemDto {}
 
 export class ListTeachingGroupAdminResponseDto {
   @ApiProperty({ type: [TeachingGroupItemDto] })
@@ -731,7 +731,7 @@ export class SaveCourseDraftDto {
   draft_content: CourseOutlineDraftDto;
 }
 
-export class PublishCourseOutlineDto extends SaveCourseDraftDto { }
+export class PublishCourseOutlineDto extends SaveCourseDraftDto {}
 
 export class ChapterQuickUpdateDto {
   @ApiProperty({ description: '章节ID', example: '201' })

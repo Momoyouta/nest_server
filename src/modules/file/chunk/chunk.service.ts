@@ -43,7 +43,8 @@ export class ChunkService {
    * 支持断点续传：同一 fileHash 存在 pending 记录时直接返回
    */
   async initUpload(dto: InitChunkDto) {
-    const { fileHash, fileName, fileSize, totalChunks } = dto;
+    const { fileHash, fileName, fileSize, totalChunks, type, schoolId } = dto;
+    const userId = this.alsService.getUserId();
 
     // 查找已有的 pending/merging 记录（断点续传）
     const existing = await this.chunkRepo.findOne({
@@ -82,6 +83,9 @@ export class ChunkService {
       totalChunks,
       uploadedChunks: [],
       status: 'pending',
+      type,
+      creatorId: userId,
+      schoolId,
       createTime: now,
       updateTime: now,
     });
@@ -158,12 +162,16 @@ export class ChunkService {
    */
   async mergeChunks(dto: MergeChunkDto) {
     const { uploadId, fileHash } = dto;
-    const targetPath = this.uploadService.resolveBusinessStoragePath(dto);
 
     const record = await this.chunkRepo.findOne({ where: { id: uploadId } });
     if (!record) {
       throw new NotFoundException('上传任务不存在');
     }
+
+    const targetPath = this.uploadService.resolveBusinessStoragePath({
+      ...dto,
+      type: record.type,
+    });
 
     // 幂等处理：已完成直接返回
     if (record.status === 'done') {
@@ -264,7 +272,9 @@ export class ChunkService {
   }
 
   /** 用户端：初始化分片上传（需校验为课程创建者） */
-  async initUploadUser(dto: InitChunkUserDto): Promise<ReturnType<ChunkService['initUpload']>> {
+  async initUploadUser(
+    dto: InitChunkUserDto,
+  ): Promise<ReturnType<ChunkService['initUpload']>> {
     await this.validateCourseOwnership(dto.courseId);
     return this.initUpload(dto);
   }
@@ -279,13 +289,17 @@ export class ChunkService {
   }
 
   /** 用户端：查询分片进度（仅校验教师身份） */
-  async getProgressUser(fileHash: string): Promise<ReturnType<ChunkService['getProgress']>> {
+  async getProgressUser(
+    fileHash: string,
+  ): Promise<ReturnType<ChunkService['getProgress']>> {
     await this.validateCourseOwnership();
     return this.getProgress(fileHash);
   }
 
   /** 用户端：合并分片（需校验为课程创建者） */
-  async mergeChunksUser(dto: MergeChunkUserDto): Promise<ReturnType<ChunkService['mergeChunks']>> {
+  async mergeChunksUser(
+    dto: MergeChunkUserDto,
+  ): Promise<ReturnType<ChunkService['mergeChunks']>> {
     await this.validateCourseOwnership(dto.courseId);
     return this.mergeChunks(dto as any);
   }

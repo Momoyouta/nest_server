@@ -123,9 +123,12 @@ export class AuthController {
     }
 
     if (!token) {
-      throw new HttpException('未提供认证信息或格式错误', HttpStatus.UNAUTHORIZED);
+      throw new HttpException(
+        '未提供认证信息或格式错误',
+        HttpStatus.UNAUTHORIZED,
+      );
     }
-    
+
     await this.authService.validateTokenForFile(token);
     return Result.success('鉴权通过', null);
   }
