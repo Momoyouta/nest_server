@@ -106,14 +106,26 @@ export class AuthController {
   @ApiOperation({ summary: '静态资源鉴权 (Nginx auth_request)' })
   @ApiResponse({ status: 200, description: '鉴权成功' })
   @ApiResponse({ status: 401, description: '鉴权失败' })
-  async checkFilePermission(@Headers('authorization') authHeader: string) {
-    if (!authHeader) {
-      throw new HttpException('未提供认证信息', HttpStatus.UNAUTHORIZED);
+  async checkFilePermission(
+    @Headers('authorization') authHeader: string,
+    @Headers('x-original-uri') originalUri: string,
+  ) {
+    let token = '';
+    if (authHeader) {
+      token = authHeader.split(' ')[1];
+    } else if (originalUri) {
+      try {
+        const urlParams = new URL(originalUri, 'http://localhost').searchParams;
+        token = urlParams.get('token') || '';
+      } catch (error) {
+        // parse error ignore
+      }
     }
-    const token = authHeader.split(' ')[1];
+
     if (!token) {
-      throw new HttpException('认证格式错误', HttpStatus.UNAUTHORIZED);
+      throw new HttpException('未提供认证信息或格式错误', HttpStatus.UNAUTHORIZED);
     }
+    
     await this.authService.validateTokenForFile(token);
     return Result.success('鉴权通过', null);
   }

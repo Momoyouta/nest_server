@@ -8,8 +8,8 @@ import Redis from 'ioredis';
       provide: 'REDIS_CLIENT', // 自定义注入的 Token
       useFactory: () => {
         const client = new Redis({
-          host: 'localhost',
-          port: 6379,
+          host: process.env.REDIS_HOST,
+          port: Number(process.env.REDIS_PORT),
           password: 'root',
           keyPrefix: 'std:cache:',
           db: 0,
@@ -24,4 +24,4 @@ import Redis from 'ioredis';
   ],
   exports: ['REDIS_CLIENT'],
 })
-export class RedisModule {}
+export class RedisModule { }

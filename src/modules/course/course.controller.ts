@@ -7,6 +7,7 @@ import {
   Post,
   Put,
   Query,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -57,6 +58,7 @@ import {
   ListStudentCoursesQueryDto,
   CourseUserListResponseDto,
 } from '@/modules/course/dto/CourseAdmin.dto';
+import { SyncProgressDto } from '@/modules/course/dto/sync-progress.dto';
 import { CourseService } from '@/modules/course/course.service';
 import { InvitationService } from '../invitation/invitation.service';
 import { CreateCourseInviteDto } from '@/common/dto/invite.dto';
@@ -567,5 +569,20 @@ export class CourseController {
     const data =
       await this.invitationService.createCourseInviteByCurrentUser(payload);
     return Result.success('创建成功', data);
+  }
+
+  @Post('sync-progress')
+  @Role(AdminRolesMap.student)
+  @ApiOperation({ summary: '同步学生视频学习进度' })
+  @ApiBody({ type: SyncProgressDto })
+  @ApiResponse({
+    status: 200,
+    description: '同步成功',
+  })
+  async syncLearningProgress(
+    @Body() payload: SyncProgressDto,
+  ) {
+    const data = await this.courseService.syncLearningProgress(payload);
+    return Result.success('同步成功', data);
   }
 }

@@ -21,6 +21,7 @@ import { InvitationCode } from '@/database/entities/invitation_code.entity';
 import { SchoolAdmin } from '@/database/entities/school_admin.entity';
 import { School } from '@/database/entities/school.entity';
 import { Teacher } from '@/database/entities/teacher.entity';
+import { Student } from '@/database/entities/student.entity';
 import { User } from '@/database/entities/user.entity';
 import { DataSource, EntityManager, In, Not, Repository } from 'typeorm';
 import { v4 } from 'uuid';
@@ -61,7 +62,8 @@ import {
   CourseUserListResponseDto,
   TeacherSimpleDto,
 } from '@/modules/course/dto/CourseAdmin.dto';
-import { CourseStatusMap } from '@/common/utils/course.map';
+import { SyncProgressDto } from '@/modules/course/dto/sync-progress.dto';
+import { CourseStatusMap, BinaryFlagMap } from '@/common/utils/course.map';
 import { AdminRolesMap, PlatformAdminRoles, SchoolAdminRoles } from '@/common/utils/role.map';
 import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
 import { StorageService } from '../file/storage/storage.service';
@@ -2598,5 +2600,67 @@ export class CourseService {
     );
 
     return { course, teachingGroup };
+  }
+
+  async syncLearningProgress(
+    dto: SyncProgressDto,
+  ): Promise<any> {
+    const userId = this.alsService.getUserId();
+    if (!userId) {
+      throw new ForbiddenException('未登录');
+    }
+    const { courseId, chapterId, lessonId, progress_percent, schoolId } = dto;
+    const student = await this.dataSource
+      .getRepository(Student)
+      .findOne({ where: { user_id: userId, school_id: schoolId } });
+
+    if (!student) {
+      throw new ForbiddenException('当前用户非该校学生，无法同步进度');
+    }
+    const studentId = student.id;
+
+
+    const existingRecord = await this.courseLearningRecordRepository.findOne({
+      where: {
+        student_id: studentId,
+        course_id: courseId,
+        chapter_id: chapterId,
+        lesson_id: lessonId,
+      },
+    });
+
+    const now = String(Math.floor(Date.now() / 1000));
+
+    if (existingRecord) {
+      existingRecord.progress_percent = Math.max(
+        existingRecord.progress_percent || 0,
+        progress_percent,
+      );
+      existingRecord.last_learn_time = now;
+      if (
+        progress_percent >= 90 &&
+        existingRecord.is_completed === BinaryFlagMap.NO
+      ) {
+        existingRecord.is_completed = BinaryFlagMap.YES;
+        existingRecord.learn_count = (existingRecord.learn_count || 0) + 1;
+      }
+      await this.courseLearningRecordRepository.save(existingRecord);
+      return existingRecord;
+    } else {
+      const is_completed = progress_percent >= 90 ? BinaryFlagMap.YES : BinaryFlagMap.NO;
+      const learn_count = is_completed === BinaryFlagMap.YES ? 1 : 0;
+      const newRecord = this.courseLearningRecordRepository.create({
+        student_id: studentId,
+        course_id: courseId,
+        chapter_id: chapterId,
+        lesson_id: lessonId,
+        progress_percent,
+        learn_count,
+        is_completed,
+        last_learn_time: now,
+      });
+      await this.courseLearningRecordRepository.save(newRecord);
+      return newRecord;
+    }
   }
 }

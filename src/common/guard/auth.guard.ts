@@ -46,7 +46,6 @@ export class AuthGuard implements CanActivate {
     let payload: any;
     try {
       const context = this.alsService.getStore();
-      let tp;
       if (isAdminAuth) {
         payload = this.jwtService.verify(token, {
           secret: process.env.ADMIN_JWT_SECRET || 'nest_admin_secret',
@@ -62,8 +61,14 @@ export class AuthGuard implements CanActivate {
         }
       }
       const userId = payload?.userId;
-      if (userId && context) {
-        context.userId = payload.userId;
+      const roleIds = payload?.roleIds;
+      if (context) {
+        if (userId) {
+          context.userId = payload.userId;
+        }
+        if (roleIds) {
+          context.roleIds = payload.roleIds;
+        }
       }
       return true;
     } catch (e) {
@@ -74,11 +79,16 @@ export class AuthGuard implements CanActivate {
             algorithms: ['HS256'],
           });
           const userId = payload?.userId;
+          const roleIds = payload?.roleIds;
           const context = this.alsService.getStore();
           if (context) {
             context.platform = 'admin';
             if (userId) {
               context.userId = payload.userId;
+            }
+            if (roleIds) {
+              context.roleIds = payload.roleIds;
+
             }
           }
           return true;

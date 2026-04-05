@@ -3,4 +3,5 @@ export interface RequestContext {
   requestId?: string;
   userId?: string;
   platform?: 'admin' | 'user';
+  roleIds?: string[];
 }
