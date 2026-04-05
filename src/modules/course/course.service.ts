@@ -62,6 +62,12 @@ import {
   CourseUserListResponseDto,
   TeacherSimpleDto,
 } from '@/modules/course/dto/CourseAdmin.dto';
+import {
+  ChapterProgressDto,
+  CourseLearningProgressResponseDto,
+  GetCourseLearningProgressDto,
+  LessonProgressDto,
+} from '@/modules/course/dto/course-learning-progress.dto';
 import { SyncProgressDto } from '@/modules/course/dto/sync-progress.dto';
 import { CourseStatusMap, BinaryFlagMap } from '@/common/utils/course.map';
 import { AdminRolesMap, PlatformAdminRoles, SchoolAdminRoles } from '@/common/utils/role.map';
@@ -2645,7 +2651,14 @@ export class CourseService {
         existingRecord.learn_count = (existingRecord.learn_count || 0) + 1;
       }
       await this.courseLearningRecordRepository.save(existingRecord);
-      return existingRecord;
+      return {
+        chapter_id: existingRecord.chapter_id,
+        lesson_id: existingRecord.lesson_id,
+        progress_percent: existingRecord.progress_percent,
+        learn_count: existingRecord.learn_count,
+        is_completed: existingRecord.is_completed,
+        last_learn_time: existingRecord.last_learn_time,
+      };
     } else {
       const is_completed = progress_percent >= 90 ? BinaryFlagMap.YES : BinaryFlagMap.NO;
       const learn_count = is_completed === BinaryFlagMap.YES ? 1 : 0;
@@ -2660,7 +2673,101 @@ export class CourseService {
         last_learn_time: now,
       });
       await this.courseLearningRecordRepository.save(newRecord);
-      return newRecord;
+      return {
+        chapter_id: newRecord.chapter_id,
+        lesson_id: newRecord.lesson_id,
+        progress_percent: newRecord.progress_percent,
+        learn_count: newRecord.learn_count,
+        is_completed: newRecord.is_completed,
+        last_learn_time: newRecord.last_learn_time,
+      };
     }
+  }
+
+  async getCourseLearningProgress(
+    dto: GetCourseLearningProgressDto,
+  ): Promise<CourseLearningProgressResponseDto> {
+    const userId = this.alsService.getUserId();
+    if (!userId) {
+      throw new ForbiddenException('未登录');
+    }
+    const { courseId, schoolId } = dto;
+    const student = await this.dataSource
+      .getRepository(Student)
+      .findOne({ where: { user_id: userId, school_id: schoolId } });
+
+    if (!student) {
+      throw new ForbiddenException('当前用户非该校学生，无法查询进度');
+    }
+    const studentId = student.id;
+
+    // 1. 获取课程所有章节和课时
+    const chapters = await this.courseChapterRepository.find({
+      where: { course_id: courseId },
+      order: { sort_order: 'ASC' },
+    });
+
+    if (chapters.length === 0) {
+      return {
+        total_lessons: 0,
+        total_completed: 0,
+        chapter_progress: [],
+      };
+    }
+
+    const chapterIds = chapters.map((c) => c.id);
+    const lessons = await this.courseLessonRepository.find({
+      where: { chapter_id: In(chapterIds) },
+      order: { sort_order: 'ASC' },
+    });
+
+    // 2. 获取该学生的学习记录
+    const records = await this.courseLearningRecordRepository.find({
+      where: {
+        student_id: studentId,
+        course_id: courseId,
+      },
+    });
+
+    const recordMap = new Map<string, CourseLearningRecord>();
+    records.forEach((r) => recordMap.set(r.lesson_id, r));
+
+    // 3. 统计数据
+    let totalCompleted = 0;
+    const chapterProgress: ChapterProgressDto[] = chapters.map((chapter) => {
+      const chapterLessons = lessons.filter((l) => l.chapter_id === chapter.id);
+      
+      const lessonProgressList: LessonProgressDto[] = chapterLessons.map((lesson) => {
+        const record = recordMap.get(lesson.id);
+        return {
+          lesson_id: lesson.id,
+          lesson_title: lesson.title,
+          progress_percent: record?.progress_percent ?? 0,
+          learn_count: record?.learn_count ?? 0,
+          is_completed: record?.is_completed ?? BinaryFlagMap.NO,
+          last_learn_time: record?.last_learn_time ?? null,
+        };
+      });
+
+      const completedInChapter = lessonProgressList.filter(
+        (lp) => lp.is_completed === BinaryFlagMap.YES,
+      ).length;
+
+      totalCompleted += completedInChapter;
+
+      return {
+        chapter_id: chapter.id,
+        chapter_title: chapter.title,
+        total_lessons: chapterLessons.length,
+        completed_lessons: completedInChapter,
+        lessons: lessonProgressList,
+      };
+    });
+
+    return {
+      total_lessons: lessons.length,
+      total_completed: totalCompleted,
+      chapter_progress: chapterProgress,
+    };
   }
 }

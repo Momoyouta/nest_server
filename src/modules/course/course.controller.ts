@@ -58,6 +58,10 @@ import {
   ListStudentCoursesQueryDto,
   CourseUserListResponseDto,
 } from '@/modules/course/dto/CourseAdmin.dto';
+import {
+  CourseLearningProgressResponseDto,
+  GetCourseLearningProgressDto,
+} from '@/modules/course/dto/course-learning-progress.dto';
 import { SyncProgressDto } from '@/modules/course/dto/sync-progress.dto';
 import { CourseService } from '@/modules/course/course.service';
 import { InvitationService } from '../invitation/invitation.service';
@@ -584,5 +588,21 @@ export class CourseController {
   ) {
     const data = await this.courseService.syncLearningProgress(payload);
     return Result.success('同步成功', data);
+  }
+
+  @Post('getLearningProgress')
+  @Role(AdminRolesMap.student)
+  @ApiOperation({ summary: '查询学生课程学习进度' })
+  @ApiBody({ type: GetCourseLearningProgressDto })
+  @ApiResponse({
+    status: 200,
+    description: '查询成功',
+    type: CourseLearningProgressResponseDto,
+  })
+  async getCourseLearningProgress(
+    @Body() payload: GetCourseLearningProgressDto,
+  ) {
+    const data = await this.courseService.getCourseLearningProgress(payload);
+    return Result.success('查询成功', data);
   }
 }
