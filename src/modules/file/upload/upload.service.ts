@@ -64,6 +64,9 @@ export class UploadService {
         }
         return 'uploads/temp/videos';
 
+      case FileUploadScenario.TEMP_DOCUMENT:
+        return 'uploads/temp/document';
+
       default:
         throw new BadRequestException('未知的上传场景');
     }

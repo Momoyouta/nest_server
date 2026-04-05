@@ -95,6 +95,8 @@ src/
     └── temp\
 	    ├── videos 
 	    |   └── {file_hash.mp4}  
+        ├── document
+	    |   └── {file_hash.mp4}  
 	    ├── images   
 	    |   └── {file_hash.png}                         
         └── chunks\                  

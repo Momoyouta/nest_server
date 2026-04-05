@@ -43,6 +43,10 @@ export const FilePathTemplate = {
   schoolResourceImages: (schoolId: number | string) =>
     resolvePath('schools', String(schoolId), 'resource_library', 'images'),
 
+  /** 学校资源库子目录：资料 */
+  schoolResourceMaterials: (schoolId: number | string) =>
+    resolvePath('schools', String(schoolId), 'resource_library', 'materials'),
+
   /** 学校私有目录 (证明等) */
   schoolPrivate: (schoolId: number | string) =>
     resolvePath('schools', String(schoolId), 'private'),
@@ -146,6 +150,9 @@ export const FilePathTemplate = {
   /** 临时视频目录 */
   tempVideos: () => resolvePath('uploads', 'temp', 'videos'),
 
+  /** 临时文档目录 */
+  tempDocuments: () => resolvePath('uploads', 'temp', 'document'),
+
   /** 分片上传临时目录 */
   chunkTemp: (fileHash: string) =>
     resolvePath('uploads', 'temp', 'chunks', fileHash),
@@ -158,4 +165,5 @@ export const FilePathTemplate = {
 export const FilePathMap = {
   TEMP_IMG: 'uploads/temp/images',
   TEMP_VIDEO: 'uploads/temp/videos',
+  TEMP_DOC: 'uploads/temp/document',
 };

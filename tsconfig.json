@@ -1,8 +1,7 @@
 {
   "compilerOptions": {
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "resolvePackageJsonExports": true,
+    "module": "commonjs",
+    "moduleResolution": "node",
     "esModuleInterop": true,
     "isolatedModules": true,
     "declaration": true,
@@ -14,8 +13,10 @@
     "sourceMap": true,
     "outDir": "./dist",
     "baseUrl": "./",
-    "paths": {        // 配置路径映射
-      "@/*": ["src/*"],
+    "paths": { // 配置路径映射
+      "@/*": [
+        "src/*"
+      ],
     },
     "incremental": true,
     "skipLibCheck": true,

@@ -4,4 +4,5 @@ export enum FileUploadScenario {
   COURSE_HOMEWORK = 'course_homework',
   COURSE_RESOURCE = 'course_resource',
   TEMP_VIDEO = 'temp_video',
+  TEMP_DOCUMENT = 'temp_document',
 }
