@@ -176,7 +176,10 @@ export class ChunkService {
     // 幂等处理：已完成直接返回
     if (record.status === 'done') {
       const ext = record.fileName.split('.').pop();
-      return { filePath: `${record.targetPath}/${fileHash}.${ext}` };
+      return {
+        fileId: record.id,
+        filePath: `${record.targetPath}/${fileHash}.${ext}`.replace(/\\/g, '/'),
+      };
     }
 
     // 校验分片完整性
@@ -227,6 +230,7 @@ export class ChunkService {
       });
 
       return {
+        fileId: record.id,
         filePath: `${targetPath}/${outputFileName}`.replace(/\\/g, '/'),
       };
     } catch (error) {
