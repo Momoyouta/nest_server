@@ -5,9 +5,11 @@ import {
   Param,
   Post,
   Query,
+  Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
@@ -35,6 +37,7 @@ import { CreateCourseDirDto } from './storage/dto/create-course-dir.dto';
 import { CreateChapterLessonDirDto } from './storage/dto/create-chapter-lesson-dir.dto';
 import { CreateHomeworkDirDto } from './storage/dto/create-homework-dir.dto';
 import { QueryFileUserDto } from './chunk/dto/query-file-user.dto';
+import { DownloadFileDto } from './chunk/dto/download-file.dto';
 import { FilePathMap, FilePathTemplate } from '@/common/utils/file-path.map';
 import { Public, AllJwtAuth } from '@/common/decorators/auth.decorator';
 import { AdminAuth } from '@/common/decorators/admin-auth.decorator';
@@ -48,7 +51,7 @@ export class FileController {
     private readonly chunkService: ChunkService,
     private readonly storageService: StorageService,
     private readonly cleanupTask: CleanupTask,
-  ) {}
+  ) { }
 
   // ===== 小文件上传 =====
   @Post('upload/image')
@@ -280,6 +283,24 @@ export class FileController {
   async queryFiles(@Query() query: QueryFileUserDto) {
     const data = await this.chunkService.queryFilesUser(query);
     return { code: 200, msg: '查询成功', data };
+  }
+
+  @Get('download')
+  @AllJwtAuth()
+  @ApiOperation({
+    summary: '下载文件',
+    description: '通过 schoolId 和 fileHash 下载原始文件',
+  })
+  @ApiResponse({ status: 200, description: '文件流' })
+  @ApiResponse({ status: 404, description: '文件不存在' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async downloadFile(@Query() dto: DownloadFileDto, @Res() res: Response) {
+    const { absolutePath, fileName } = await this.chunkService.downloadFile(
+      dto,
+    );
+    // 使用 Express 的 res.download 进行文件传输
+    // 第二个参数是下载时保存的默认文件名
+    res.download(absolutePath, fileName);
   }
 
   // ===== 目录管理 =====

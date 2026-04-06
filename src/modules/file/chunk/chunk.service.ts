@@ -17,16 +17,19 @@ import {
   FilePathTemplate,
   getFileStoreRoot,
 } from '@/common/utils/file-path.map';
+import { PlatformAdminRoles } from '@/common/utils/role.map';
 import { UploadService } from '../upload/upload.service';
 import { Teacher } from '@/database/entities/teacher.entity';
 import { Student } from '@/database/entities/student.entity';
 import { User } from '@/database/entities/user.entity';
 import { Course } from '@/database/entities/course.entity';
+import { SchoolAdmin } from '@/database/entities/school_admin.entity';
 import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
 import { InitChunkUserDto } from './dto/init-chunk-user.dto';
 import { UploadChunkUserDto } from './dto/upload-chunk-user.dto';
 import { MergeChunkUserDto } from './dto/merge-chunk-user.dto';
 import { QueryFileUserDto } from './dto/query-file-user.dto';
+import { DownloadFileDto } from './dto/download-file.dto';
 
 @Injectable()
 export class ChunkService {
@@ -37,6 +40,8 @@ export class ChunkService {
     private readonly teacherRepository: Repository<Teacher>,
     @InjectRepository(Student)
     private readonly studentRepository: Repository<Student>,
+    @InjectRepository(SchoolAdmin)
+    private readonly schoolAdminRepository: Repository<SchoolAdmin>,
     @InjectRepository(Course)
     private readonly courseRepository: Repository<Course>,
     private readonly uploadService: UploadService,
@@ -411,6 +416,87 @@ export class ChunkService {
     return {
       items,
       total,
+    };
+  }
+
+  /**
+   * 下载文件：根据 schoolId 和 fileHash 获取文件物理路径及原始文件名
+   * 包含基础权限校验：当前用户所属学校必须匹配
+   */
+  async downloadFile(dto: DownloadFileDto) {
+    const store = this.alsService.getStore();
+    const userId = store?.userId;
+
+    // 适配单角色字符串或多角色数组的情况
+    let roleIds: string[] = [];
+    if (store?.roleIds) {
+      roleIds = Array.isArray(store.roleIds) ? store.roleIds : [store.roleIds];
+    }
+
+    if (!userId) {
+      throw new ForbiddenException('未登录');
+    }
+
+    const { schoolId, fileHash } = dto;
+
+    // 1. 判断是否为平台管理员
+    const isPlatformAdmin = roleIds.some((roleId) =>
+      PlatformAdminRoles.includes(roleId),
+    );
+
+    // 2. 权限校验
+    if (!isPlatformAdmin) {
+      // 非平台管理员，必须校验 schoolId
+      // 获取用户所属学校 (可能是教师、学生或学校管理员)
+      const [teacher, student, schoolAdmin] = await Promise.all([
+        this.teacherRepository.findOne({ where: { user_id: userId } }),
+        this.studentRepository.findOne({ where: { user_id: userId } }),
+        this.schoolAdminRepository.findOne({ where: { user_id: userId } }),
+      ]);
+
+      const userSchoolId =
+        teacher?.school_id || student?.school_id || schoolAdmin?.school_id;
+
+      if (!userSchoolId) {
+        throw new ForbiddenException('当前用户未绑定学校，无权下载文件');
+      }
+
+      if (schoolId !== userSchoolId) {
+        throw new ForbiddenException('无权下载其他学校的文件资源');
+      }
+    }
+
+    // 3. 查询已完成的文件记录
+    const record = await this.chunkRepo.findOne({
+      where: {
+        schoolId,
+        fileHash,
+        status: 'done',
+      },
+    });
+
+    if (!record) {
+      throw new NotFoundException('找不到指定的文件记录');
+    }
+
+    // 4. 拼接物理路径
+    // 根据 mergeChunks 逻辑，文件名为 ${fileHash}.${ext}
+    const ext = record.fileName.split('.').pop() || '';
+    const outputFileName = ext ? `${fileHash}.${ext}` : fileHash;
+    const absolutePath = path.join(
+      getFileStoreRoot(),
+      record.targetPath || '',
+      outputFileName,
+    );
+
+    // 5. 校验物理文件是否存在
+    if (!fs.existsSync(absolutePath)) {
+      throw new NotFoundException('物理文件不存在或已被删除');
+    }
+
+    return {
+      absolutePath,
+      fileName: record.fileName, // 原始文件名
     };
   }
 }
