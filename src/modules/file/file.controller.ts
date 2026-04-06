@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -33,6 +34,7 @@ import { CreateSchoolDirDto } from './storage/dto/create-school-dir.dto';
 import { CreateCourseDirDto } from './storage/dto/create-course-dir.dto';
 import { CreateChapterLessonDirDto } from './storage/dto/create-chapter-lesson-dir.dto';
 import { CreateHomeworkDirDto } from './storage/dto/create-homework-dir.dto';
+import { QueryFileUserDto } from './chunk/dto/query-file-user.dto';
 import { FilePathMap, FilePathTemplate } from '@/common/utils/file-path.map';
 import { Public, AllJwtAuth } from '@/common/decorators/auth.decorator';
 import { AdminAuth } from '@/common/decorators/admin-auth.decorator';
@@ -269,6 +271,15 @@ export class FileController {
   async mergeChunksUser(@Body() dto: MergeChunkUserDto) {
     const data = await this.chunkService.mergeChunksUser(dto);
     return { code: 200, msg: '合并成功', data };
+  }
+
+  @Get('query')
+  @Role(AdminRolesMap.teacher, AdminRolesMap.student)
+  @ApiOperation({ summary: '用户端：分页模糊查询本校文件' })
+  @ApiResponse({ status: 200, description: '查询成功' })
+  async queryFiles(@Query() query: QueryFileUserDto) {
+    const data = await this.chunkService.queryFilesUser(query);
+    return { code: 200, msg: '查询成功', data };
   }
 
   // ===== 目录管理 =====

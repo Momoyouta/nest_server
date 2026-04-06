@@ -19,11 +19,14 @@ import {
 } from '@/common/utils/file-path.map';
 import { UploadService } from '../upload/upload.service';
 import { Teacher } from '@/database/entities/teacher.entity';
+import { Student } from '@/database/entities/student.entity';
+import { User } from '@/database/entities/user.entity';
 import { Course } from '@/database/entities/course.entity';
 import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
 import { InitChunkUserDto } from './dto/init-chunk-user.dto';
 import { UploadChunkUserDto } from './dto/upload-chunk-user.dto';
 import { MergeChunkUserDto } from './dto/merge-chunk-user.dto';
+import { QueryFileUserDto } from './dto/query-file-user.dto';
 
 @Injectable()
 export class ChunkService {
@@ -32,6 +35,8 @@ export class ChunkService {
     private readonly chunkRepo: Repository<FileChunk>,
     @InjectRepository(Teacher)
     private readonly teacherRepository: Repository<Teacher>,
+    @InjectRepository(Student)
+    private readonly studentRepository: Repository<Student>,
     @InjectRepository(Course)
     private readonly courseRepository: Repository<Course>,
     private readonly uploadService: UploadService,
@@ -340,7 +345,72 @@ export class ChunkService {
       });
       count++;
     }
-
     return count;
+  }
+
+  /** 用户端：分页查询文件（模糊搜索 + 学校校验） */
+  async queryFilesUser(dto: QueryFileUserDto) {
+    const userId = this.alsService.getUserId();
+    if (!userId) {
+      throw new ForbiddenException('未登录');
+    }
+
+    const { page = 1, pageSize = 10, filename, schoolId } = dto;
+
+    // 1. 获取用户所属学校
+    const [teacher, student] = await Promise.all([
+      this.teacherRepository.findOne({ where: { user_id: userId } }),
+      this.studentRepository.findOne({ where: { user_id: userId } }),
+    ]);
+
+    const userSchoolId = teacher?.school_id || student?.school_id;
+
+    // 2. 校验 schoolId 权限
+    if (!userSchoolId) {
+      // 如果没有绑定的学校，且不是管理员（管理员通常不通过这个接口查，或者走 admin 接口）
+      // 这里为严谨，如果没学校信息，则禁止查询
+      throw new ForbiddenException('当前用户未绑定学校，无权查询文件');
+    }
+
+    if (schoolId !== userSchoolId) {
+      throw new ForbiddenException('无权查询其他学校的文件资源');
+    }
+
+    // 3. 构建查询条件 (仅查询状态为 done 的记录)
+    const qb = this.chunkRepo.createQueryBuilder('fc')
+      .leftJoin(User, 'u', 'u.id = fc.creator_id')
+      .select([
+        'fc.id as id',
+        'fc.file_hash as fileHash',
+        'fc.file_name as fileName',
+        'fc.file_size as fileSize',
+        'fc.target_path as targetPath',
+        'fc.type as type',
+        'fc.creator_id as creatorId',
+        'fc.school_id as schoolId',
+        'fc.create_time as createTime',
+        'fc.update_time as updateTime',
+      ])
+      .addSelect('u.name', 'creatorName')
+      .where('fc.school_id = :schoolId', { schoolId })
+      .andWhere("fc.status = 'done'");
+
+    if (filename) {
+      qb.andWhere('fc.file_name LIKE :filename', {
+        filename: `%${filename}%`,
+      });
+    }
+
+    const total = await qb.getCount();
+    const items = await qb
+      .orderBy('fc.update_time', 'DESC')
+      .skip((page - 1) * pageSize)
+      .take(pageSize)
+      .getRawMany();
+
+    return {
+      items,
+      total,
+    };
   }
 }

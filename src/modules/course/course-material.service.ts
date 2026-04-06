@@ -188,19 +188,21 @@ export class CourseMaterialService {
     const qb = this.materialRepo
       .createQueryBuilder('cm')
       .innerJoin(FileChunk, 'fc', 'fc.id = cm.file_id')
-      .leftJoin(User, 'u', 'u.id = cm.uploader_id') // 注意这里逻辑，如果是教师上传，uploader_id 可能存的是 teacher.id
-      // 这里的 uploader_id 可能是 teacher.id, school_admin.id 或 user.id
-      // 为了拿到姓名，可能需要根据角色多表 JOIN。简单起见，如果 uploader_id 是 user.id 直接 JOIN User
-      // 如果 uploader_id 是业务 ID，需特殊处理。
-      // 统一建议：在 DDL 设计中，uploader_id 存储 User.id 最通用。
+      .leftJoin(User, 'cu', 'cu.id = fc.creator_id')
       .select([
         'cm.id as id',
-        'cm.file_id as file_id',
-        'fc.file_name as file_name',
-        'cm.uploader_id as uploader_id',
-        'cm.create_time as create_time',
+        'fc.id as fileId',
+        'fc.fileHash as fileHash',
+        'fc.fileName as fileName',
+        'fc.fileSize as fileSize',
+        'fc.targetPath as targetPath',
+        'fc.type as type',
+        'fc.creatorId as creatorId',
+        'fc.schoolId as schoolId',
+        'fc.create_time as createTime',
+        'fc.update_time as updateTime',
       ])
-      .addSelect('u.name', 'uploader_name') // 假设 uploader_id 指向 User.id
+      .addSelect('cu.name', 'creatorName')
       .where('cm.course_id = :courseId', { courseId: query.course_id });
 
     if (query.file_name) {

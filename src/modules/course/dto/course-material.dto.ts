@@ -64,19 +64,37 @@ export class MaterialItemDto {
   id: string;
 
   @ApiProperty({ description: '文件ID' })
-  file_id: string;
+  fileId: string;
+
+  @ApiProperty({ description: '文件Hash' })
+  fileHash: string;
 
   @ApiProperty({ description: '文件名' })
-  file_name: string;
+  fileName: string;
 
-  @ApiProperty({ description: '上传者ID' })
-  uploader_id: string;
+  @ApiProperty({ description: '文件大小' })
+  fileSize: string;
 
-  @ApiProperty({ description: '上传者姓名' })
-  uploader_name: string;
+  @ApiProperty({ description: '存储路径' })
+  targetPath: string;
 
-  @ApiProperty({ description: '绑定时间戳(s)' })
-  create_time: string;
+  @ApiProperty({ description: '文件类型' })
+  type: number;
+
+  @ApiProperty({ description: '创建者ID' })
+  creatorId: string;
+
+  @ApiProperty({ description: '学校ID' })
+  schoolId: string;
+
+  @ApiProperty({ description: '创建时间' })
+  createTime: string;
+
+  @ApiProperty({ description: '更新时间' })
+  updateTime: string;
+
+  @ApiProperty({ description: '创建者姓名' })
+  creatorName: string;
 }
 
 export class ListMaterialResponseDto {
