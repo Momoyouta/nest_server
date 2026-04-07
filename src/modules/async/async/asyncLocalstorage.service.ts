@@ -22,6 +22,18 @@ export class AsyncLocalstorageService implements OnModuleDestroy {
     return this.getStore()?.userId;
   }
 
+  getSchoolId(): string | undefined {
+    return this.getStore()?.schoolId;
+  }
+
+  getActorType(): number | undefined {
+    return this.getStore()?.actorType;
+  }
+
+  getActorId(): string | undefined {
+    return this.getStore()?.actorId;
+  }
+
   onModuleDestroy() {
     this.asyncLocalStorage.disable();
   }

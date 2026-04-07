@@ -17,6 +17,9 @@ import { InvitationService } from '../invitation/invitation.service';
 import { UserService } from '../user/user.service';
 import { CurrentUserProfile } from '../user/dto/CurrentUserProfile.dto';
 import { InvitationTypeMap } from '@/common/utils/invite-type.map';
+import { SelectSchoolDto, SwitchSchoolDto, PendingLoginResponseDto, SelectSchoolResponseDto, SwitchSchoolResponseDto } from './dto/school-auth.dto';
+import { UserSchoolIdentity } from '@/database/entities/user_school_identity.entity';
+import { School } from '@/database/entities/school.entity';
 
 @Injectable()
 export class AuthService {
@@ -79,11 +82,14 @@ export class AuthService {
     }
     registerUserDto.phone = registerUserDto.account;
 
-    // 3. 校验邀请码
+    // 3. 强制校验邀请码：邀请码无效（不存在或已过期）则禁止注册
     const inviteData =
       await this.invitationService.getInviteDataPreferRedis(inviteCode);
     if (!inviteData) {
-      throw new HttpException('邀请码不存在或已过期', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        '注册失败：邀请码不存在、已过期或已被撤回，请联系管理员获取有效邀请码',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     // 4. 校验邀请码类型与请求角色是否匹配
@@ -117,8 +123,6 @@ export class AuthService {
       savedUser = await this.userService.createStudentWithUser(
         registerUserDto,
         inviteData.school_id,
-        inviteData.grade,
-        inviteData.class_id,
       );
     }
 
@@ -143,27 +147,151 @@ export class AuthService {
     return bcrypt.compare(pwd, hash);
   }
 
-  async generateAuthResponse(user: User) {
+  async generateAuthResponse(user: User): Promise<PendingLoginResponseDto> {
     const roles = await this.roleRepository.find({
       select: { nameEN: true },
       where: {
-        id: In(user.role_id.split(',')),
+        id: In(user.role_id ? user.role_id.split(',') : []),
       },
     });
     const userRoles = roles.map((role) => role.nameEN);
+
+    // 查询可选择的学校
+    const identities = await this.dataSource.getRepository(UserSchoolIdentity).find({
+      where: { user_id: user.id, status: 1 }
+    });
+    const schoolIds = identities.map(i => i.school_id);
+    let schools: School[] = [];
+    if (schoolIds.length > 0) {
+      schools = await this.dataSource.getRepository(School).find({
+        where: { id: In(schoolIds) }
+      });
+    }
+
+    const selectableSchools = identities.map(identity => {
+       const school = schools.find(s => s.id === identity.school_id);
+       return {
+         schoolId: identity.school_id,
+         schoolName: school?.name || '未知学校',
+         actorType: identity.actor_type,
+         actorId: identity.actor_id,
+       };
+    });
 
     const tokenPayload: TokenPayloadDto = {
       userId: user.id,
       roleIds: user.role_id,
       roles: userRoles,
+      tokenType: 'pending-school',
+      selectableSchoolIds: schoolIds,
     };
-    const token = await this.jwtService.signAsync({ ...tokenPayload });
-    const userProfile = await this.userService.getSelfProfileInfo(user.id);
+    
+    const token = await this.jwtService.signAsync(
+      { ...tokenPayload },
+      { expiresIn: '10m' }
+    );
 
     return {
       token,
+      selectableSchools,
+      baseUserInfo: {
+        userId: user.id,
+        userRoles: userRoles,
+        userName: user.name,
+      }
+    };
+  }
+
+  async selectSchool(token: string, dto: SelectSchoolDto): Promise<SelectSchoolResponseDto> {
+    const payload = await this.jwtService.verifyAsync<TokenPayloadDto>(token);
+    // 兼容历史token，如果没有tokenType
+    if (payload.tokenType && payload.tokenType !== 'pending-school') {
+      throw new HttpException('Token类型不匹配,需要pending-school', HttpStatus.BAD_REQUEST);
+    }
+    
+    const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
+      where: { user_id: payload.userId, school_id: dto.schoolId, status: 1 }
+    });
+    if (!identity) {
+      throw new HttpException('学校身份不存在或已禁用', HttpStatus.FORBIDDEN);
+    }
+
+    const tokenPayload: TokenPayloadDto = {
+      userId: payload.userId,
+      roleIds: payload.roleIds,
+      roles: payload.roles,
+      tokenType: 'access',
+      schoolId: dto.schoolId,
+      actorType: identity.actor_type,
+      actorId: identity.actor_id,
+    };
+    const accessToken = await this.jwtService.signAsync({ ...tokenPayload });
+    const user = await this.userRepository.findOne({ where: { id: payload.userId } });
+    const userProfile = await this.userService.getSelfProfileInfo(payload.userId);
+
+    return {
+      token: accessToken,
+      baseUserInfo: {
+        userId: payload.userId,
+        userRoles: payload.roles,
+        userName: user?.name || '',
+        schoolId: dto.schoolId,
+      },
       userProfile,
     };
+  }
+
+  async switchSchool(token: string, dto: SwitchSchoolDto): Promise<SwitchSchoolResponseDto> {
+    const payload = await this.jwtService.verifyAsync<TokenPayloadDto>(token);
+    if (payload.tokenType !== 'access') {
+      throw new HttpException('Token类型不匹配,需要access', HttpStatus.BAD_REQUEST);
+    }
+    const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
+      where: { user_id: payload.userId, school_id: dto.schoolId, status: 1 }
+    });
+    if (!identity) {
+      throw new HttpException('无权访问该学校或身份不存在', HttpStatus.FORBIDDEN);
+    }
+
+    const tokenPayload: TokenPayloadDto = {
+      userId: payload.userId,
+      roleIds: payload.roleIds,
+      roles: payload.roles,
+      tokenType: 'access',
+      schoolId: dto.schoolId,
+      actorType: identity.actor_type,
+      actorId: identity.actor_id,
+    };
+    const accessToken = await this.jwtService.signAsync({ ...tokenPayload });
+
+    return {
+      token: accessToken,
+      schoolId: dto.schoolId,
+    };
+  }
+
+  async listSelectableSchools(token: string) {
+    const payload = await this.jwtService.verifyAsync<TokenPayloadDto>(token);
+    const identities = await this.dataSource.getRepository(UserSchoolIdentity).find({
+      where: { user_id: payload.userId, status: 1 }
+    });
+    const schoolIds = identities.map(i => i.school_id);
+    let schools: School[] = [];
+    if (schoolIds.length > 0) {
+      schools = await this.dataSource.getRepository(School).find({
+        where: { id: In(schoolIds) }
+      });
+    }
+
+    return identities.map(identity => {
+       const school = schools.find(s => s.id === identity.school_id);
+       return {
+         schoolId: identity.school_id,
+         schoolName: school?.name || '未知学校',
+         actorType: identity.actor_type,
+         actorId: identity.actor_id,
+       };
+    });
   }
 
   async verifyTokenWithProfile(token: string): Promise<CurrentUserProfile> {
@@ -181,7 +309,7 @@ export class AuthService {
    */
   async verifyToken(token: string): Promise<BaseUserInfo> {
     try {
-      const payload = await this.jwtService.verifyAsync(token);
+      const payload = await this.jwtService.verifyAsync<TokenPayloadDto>(token);
       // Fetch user name to complete baseUserInfo
       const user = await this.userRepository.findOne({
         where: { id: payload.userId },
@@ -192,34 +320,15 @@ export class AuthService {
         throw new Error('User not found');
       }
 
-      let schoolId: string | undefined = undefined;
-      const roleIdArr = payload.roleIds ? payload.roleIds.split(',') : [];
-      if (roleIdArr.includes(AdminRolesMap.student)) {
-        const student = await this.dataSource
-          .getRepository(Student)
-          .findOne({ where: { user_id: payload.userId } });
-        if (student?.school_id) schoolId = String(student.school_id);
-      } else if (roleIdArr.includes(AdminRolesMap.teacher)) {
-        const teacher = await this.dataSource
-          .getRepository(Teacher)
-          .findOne({ where: { user_id: payload.userId } });
-        if (teacher?.school_id) schoolId = String(teacher.school_id);
-      } else if (
-        roleIdArr.includes(AdminRolesMap.school_admin) ||
-        roleIdArr.includes(AdminRolesMap.school_root)
-      ) {
-        const schoolAdmin = await this.dataSource
-          .getRepository(SchoolAdmin)
-          .findOne({ where: { user_id: payload.userId } });
-        if (schoolAdmin?.school_id) schoolId = String(schoolAdmin.school_id);
-      }
-
-      return {
+      const baseInfo: BaseUserInfo = {
         userId: payload.userId,
         userRoles: payload.roles,
         userName: user.name,
-        schoolId: schoolId,
       };
+      if (payload.schoolId) {
+        baseInfo.schoolId = payload.schoolId;
+      }
+      return baseInfo;
     } catch (e) {
       throw new HttpException('token无效或已过期', HttpStatus.BAD_REQUEST);
     }

@@ -13,6 +13,7 @@ import { Student } from '@/database/entities/student.entity';
 import { Teacher } from '@/database/entities/teacher.entity';
 import { SchoolAdmin } from '@/database/entities/school_admin.entity';
 import { School } from '@/database/entities/school.entity';
+import { UserSchoolIdentity } from '@/database/entities/user_school_identity.entity';
 import { AdminRolesMap } from '@/common/utils/role.map';
 import { BaseQueryDto } from '@/common/dto/base-query.dto';
 import {
@@ -529,19 +530,22 @@ export class UserService {
   ): Promise<User> {
     return await this.dataSource.transaction(async (manager) => {
       // 1. 创建用户
-      if (userData.password) {
-        userData.password = await bcrypt.hash(
-          String(userData.password),
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { id, inviteCode: _, ...restData } = userData as any;
+
+      if (restData.password) {
+        restData.password = await bcrypt.hash(
+          String(restData.password),
           await bcrypt.genSalt(10),
         );
       }
       const now = String(Math.floor(Date.now() / 1000));
-      userData.create_time = now;
-      userData.update_time = now;
-      userData.role_id = AdminRolesMap.teacher;
-      userData.status = 1;
+      restData.create_time = now;
+      restData.update_time = now;
+      restData.role_id = AdminRolesMap.teacher;
+      restData.status = 1;
 
-      const user = manager.create(User, userData);
+      const user = manager.create(User, restData);
       const savedUser = await manager.save(User, user);
 
       // 2. 创建教师实体
@@ -549,7 +553,17 @@ export class UserService {
         user_id: savedUser.id,
         school_id: schoolId,
       });
-      await manager.save(Teacher, teacher);
+      const savedTeacher = await manager.save(Teacher, teacher);
+
+      // 3. 创建多租户身份映射
+      const identity = manager.create(UserSchoolIdentity, {
+        user_id: savedUser.id,
+        school_id: schoolId,
+        actor_type: 1, // teacher
+        actor_id: savedTeacher.id,
+        status: 1,
+      });
+      await manager.save(UserSchoolIdentity, identity);
 
       return savedUser;
     });
@@ -561,34 +575,43 @@ export class UserService {
   async createStudentWithUser(
     userData: Partial<User>,
     schoolId: string,
-    grade?: string,
-    classId?: string,
   ): Promise<User> {
     return await this.dataSource.transaction(async (manager) => {
       // 1. 创建用户
-      if (userData.password) {
-        userData.password = await bcrypt.hash(
-          String(userData.password),
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { id, inviteCode: _, ...restData } = userData as any;
+
+      if (restData.password) {
+        restData.password = await bcrypt.hash(
+          String(restData.password),
           await bcrypt.genSalt(10),
         );
       }
       const now = String(Math.floor(Date.now() / 1000));
-      userData.create_time = now;
-      userData.update_time = now;
-      userData.role_id = AdminRolesMap.student;
-      userData.status = 1;
+      restData.create_time = now;
+      restData.update_time = now;
+      restData.role_id = AdminRolesMap.student;
+      restData.status = 1;
 
-      const user = manager.create(User, userData);
+      const user = manager.create(User, restData);
       const savedUser = await manager.save(User, user);
 
       // 2. 创建学生实体
       const student = manager.create(Student, {
         user_id: savedUser.id,
         school_id: schoolId,
-        grade_id: grade,
-        class_id: classId,
       });
-      await manager.save(Student, student);
+      const savedStudent = await manager.save(Student, student);
+
+      // 3. 创建多租户身份映射
+      const identity = manager.create(UserSchoolIdentity, {
+        user_id: savedUser.id,
+        school_id: schoolId,
+        actor_type: 2, // student
+        actor_id: savedStudent.id,
+        status: 1,
+      });
+      await manager.save(UserSchoolIdentity, identity);
 
       return savedUser;
     });

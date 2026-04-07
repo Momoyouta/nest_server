@@ -24,7 +24,7 @@ import {
 } from '@/modules/student/dto/join-course-by-invite.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { InvitationCode } from '@/database/entities/invitation_code.entity';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { School } from '@/database/entities/school.entity';
 import { User } from '@/database/entities/user.entity';
 import { Course } from '@/database/entities/course.entity';
@@ -41,6 +41,8 @@ import {
 import { InvitationTypeMap } from '@/common/utils/invite-type.map';
 import { Student } from '@/database/entities/student.entity';
 import { CourseStudent } from '@/database/entities/course_student.entity';
+import { UserSchoolIdentity } from '@/database/entities/user_school_identity.entity';
+import { JoinSchoolByInviteCodeResponseDto } from '../auth/dto/join-school-by-invite.dto';
 
 @Injectable()
 export class InvitationService {
@@ -65,8 +67,11 @@ export class InvitationService {
     private readonly studentRepository: Repository<Student>,
     @InjectRepository(CourseStudent)
     private readonly courseStudentRepository: Repository<CourseStudent>,
+    @InjectRepository(UserSchoolIdentity)
+    private readonly userSchoolIdentityRepository: Repository<UserSchoolIdentity>,
     private readonly alsService: AsyncLocalstorageService,
-  ) {}
+    private readonly dataSource: DataSource,
+  ) { }
 
   /**
    * 创建邀请码并存储到数据库和 Redis
@@ -282,6 +287,107 @@ export class InvitationService {
       teaching_group_id: teachingGroup.id,
       joined: true,
     };
+  }
+
+  /**
+   * 用户通过邀请码加入学校
+   */
+  async joinSchoolByInviteCode(
+    userId: string,
+    code: string,
+  ): Promise<JoinSchoolByInviteCodeResponseDto> {
+    const inviteData = await this.getInviteDataPreferRedis(code);
+    if (!inviteData) {
+      throw new BadRequestException('邀请码不存在或已过期');
+    }
+
+    const type = Number(inviteData.type);
+    if (
+      type !== Number(InvitationTypeMap.TEACHER_JOIN_SCHOOL) &&
+      type !== Number(InvitationTypeMap.STUDENT_JOIN_SCHOOL)
+    ) {
+      throw new BadRequestException('邀请码类型不匹配，非加入学校邀请码');
+    }
+
+    const schoolId = String(inviteData.school_id);
+    if (!schoolId) {
+      throw new BadRequestException('邀请码数据异常：缺失学校ID');
+    }
+
+    return await this.dataSource.transaction(async (manager) => {
+      const teacherRepo = manager.getRepository(Teacher);
+      const studentRepo = manager.getRepository(Student);
+      const identityRepo = manager.getRepository(UserSchoolIdentity);
+
+      const actorType =
+        type === Number(InvitationTypeMap.TEACHER_JOIN_SCHOOL) ? 1 : 2;
+
+      // 1. 幂等校验：是否已拥有该学校的该身份
+      const existingIdentity = await identityRepo.findOne({
+        where: {
+          user_id: userId,
+          school_id: schoolId,
+          actor_type: actorType,
+          status: 1,
+        },
+      });
+
+      if (existingIdentity) {
+        return {
+          school_id: schoolId,
+          actor_type: actorType,
+          actor_id: existingIdentity.actor_id,
+          joined: true,
+        };
+      }
+
+      let actorId = '';
+
+      if (actorType === 1) {
+        // 加入为老师
+        let teacher = await teacherRepo.findOne({
+          where: { user_id: userId, school_id: schoolId },
+        });
+        if (!teacher) {
+          teacher = teacherRepo.create({
+            user_id: userId,
+            school_id: schoolId,
+          });
+          await teacherRepo.save(teacher);
+        }
+        actorId = teacher.id;
+      } else {
+        // 加入为学生
+        let student = await studentRepo.findOne({
+          where: { user_id: userId, school_id: schoolId },
+        });
+        if (!student) {
+          student = studentRepo.create({
+            user_id: userId,
+            school_id: schoolId,
+          });
+          await studentRepo.save(student);
+        }
+        actorId = student.id;
+      }
+
+      // 2. 创建或更新多租户身份映射
+      const newIdentity = identityRepo.create({
+        user_id: userId,
+        school_id: schoolId,
+        actor_type: actorType,
+        actor_id: actorId,
+        status: 1,
+      });
+      await identityRepo.save(newIdentity);
+
+      return {
+        school_id: schoolId,
+        actor_type: actorType,
+        actor_id: actorId,
+        joined: true,
+      };
+    });
   }
 
   /**

@@ -478,10 +478,10 @@ export class ListTeacherCoursesQueryDto {
   @Min(1)
   pageSize?: number = 10;
 
-  @ApiProperty({ description: '老师ID', example: 'teacher-uuid' })
+  @ApiPropertyOptional({ description: '老师ID (已废弃)', example: 'teacher-uuid' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  teacher_id: string;
+  teacher_id?: string;
 
   @ApiPropertyOptional({ description: '学校ID，可选', example: 'school-uuid' })
   @IsOptional()
@@ -505,10 +505,10 @@ export class ListStudentCoursesQueryDto {
   @Min(1)
   pageSize?: number = 10;
 
-  @ApiProperty({ description: '学生ID', example: 'student-uuid' })
+  @ApiPropertyOptional({ description: '学生ID (已废弃)', example: 'student-uuid' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  student_id: string;
+  student_id?: string;
 
   @ApiPropertyOptional({ description: '学校ID，可选', example: 'school-uuid' })
   @IsOptional()

@@ -4,4 +4,7 @@ export interface RequestContext {
   userId?: string;
   platform?: 'admin' | 'user';
   roleIds?: string[];
+  schoolId?: string;
+  actorType?: number;
+  actorId?: string;
 }

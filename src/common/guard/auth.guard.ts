@@ -47,6 +47,7 @@ export class AuthGuard implements CanActivate {
     try {
       const context = this.alsService.getStore();
       if (isAdminAuth) {
+        // 保持 @AdminAuth 与管理员 token 验证逻辑不变
         payload = this.jwtService.verify(token, {
           secret: process.env.ADMIN_JWT_SECRET || 'nest_admin_secret',
           algorithms: ['HS256'],
@@ -59,16 +60,34 @@ export class AuthGuard implements CanActivate {
         if (context) {
           context.platform = 'user';
         }
+        
+        // pending token 访问控制：如果尚未选校，仅允许访问认证/选校接口
+        const isAuthRoute = request.url.startsWith('/api/auth/selectSchool') || 
+                            request.url.startsWith('/api/auth/schools') || 
+                            request.url.startsWith('/api/auth/switchSchool') ||
+                            request.url.startsWith('/api/auth/join-school') ||
+                            request.url.startsWith('/auth/selectSchool') ||
+                            request.url.startsWith('/auth/schools') ||
+                            request.url.startsWith('/auth/switchSchool') ||
+                            request.url.startsWith('/auth/join-school') ||
+                            request.url.startsWith('/api/auth/jwtAuth') ||
+                            request.url.startsWith('/auth/jwtAuth');
+
+        if (payload.tokenType === 'pending-school' && !isAuthRoute) {
+          throw new HttpException('请先选择学校', HttpStatus.FORBIDDEN);
+        }
       }
-      const userId = payload?.userId;
-      const roleIds = payload?.roleIds;
+      
       if (context) {
-        if (userId) {
+        if (payload.userId) {
           context.userId = payload.userId;
         }
-        if (roleIds) {
-          context.roleIds = payload.roleIds;
+        if (payload.roleIds) {
+          context.roleIds = typeof payload.roleIds === 'string' ? payload.roleIds.split(',') : payload.roleIds;
         }
+        if (payload.schoolId) context.schoolId = payload.schoolId;
+        if (payload.actorType) context.actorType = payload.actorType;
+        if (payload.actorId) context.actorId = payload.actorId;
       }
       return true;
     } catch (e) {
@@ -87,7 +106,7 @@ export class AuthGuard implements CanActivate {
               context.userId = payload.userId;
             }
             if (roleIds) {
-              context.roleIds = payload.roleIds;
+              context.roleIds = typeof roleIds === 'string' ? roleIds.split(',') : roleIds;
             }
           }
           return true;

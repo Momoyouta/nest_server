@@ -57,9 +57,6 @@ export class CurrentStudentInfoDto {
   @ApiPropertyOptional({ description: '学号' })
   student_number?: string;
 
-  @ApiPropertyOptional({ description: '班级ID' })
-  class_id?: string;
-
   @ApiPropertyOptional({ description: '学院' })
   college?: string;
 

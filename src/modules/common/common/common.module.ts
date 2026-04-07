@@ -26,6 +26,7 @@ import { AssignmentSubmission } from '@/database/entities/assignment_submission.
 import { AssignmentAnswerDetail } from '@/database/entities/assignment_answer_detail.entity';
 import { CourseMaterial } from '@/database/entities/course_material.entity';
 import { CourseQuestionResource } from '@/database/entities/course_question_resource.entity';
+import { UserSchoolIdentity } from '@/database/entities/user_school_identity.entity';
 
 const entities = [
   User,
@@ -51,6 +52,7 @@ const entities = [
   AssignmentAnswerDetail,
   CourseMaterial,
   CourseQuestionResource,
+  UserSchoolIdentity,
 ];
 @Global()
 @Module({

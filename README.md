@@ -30,7 +30,7 @@
    - 用户端与管理端使用的 JWT 密钥与验证逻辑不同，不可混用。
 
 ### 核心功能与中间件
-- **AsyncLocalStorage**: 实现请求维度的上下文隔离，用于事务管理和日志追踪。
+- **AsyncLocalStorage**: 实现请求维度的上下文隔离，用于事务管理和日志追踪， 当前用户的userId、schoolId都在里边。
 - **RequestContextMiddleware**: 自动注入请求上下文。
 - **ConfigModule**: 环境驱动的配置管理（支持 `.env.dev` 和 `.env.prod`）。
 - **class-validator & class-transformer**: 自动化的数据校验与对象转换。

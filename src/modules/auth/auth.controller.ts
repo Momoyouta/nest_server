@@ -20,19 +20,34 @@ import {
   UserRegisterResponseDto,
   UserJwtAuthResponseDto,
 } from './dto/AuthResponse.dto';
+import { ApiBearerAuth } from '@nestjs/swagger';
+import {
+  SelectSchoolDto,
+  SwitchSchoolDto,
+  PendingLoginResponseDto,
+  SelectSchoolResponseDto,
+  SwitchSchoolResponseDto,
+} from './dto/school-auth.dto';
+import { InvitationService } from '../invitation/invitation.service';
+import { JoinSchoolByInviteCodeDto, JoinSchoolByInviteCodeResponseDto } from './dto/join-school-by-invite.dto';
+import { AsyncLocalstorageService } from '../async/async/asyncLocalstorage.service';
 
 @ApiTags('认证模块')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly invitationService: InvitationService,
+    private readonly alsService: AsyncLocalstorageService,
+  ) {}
 
   @Public()
   @Post('login')
   @ApiOperation({ summary: '用户登录-用户端' })
   @ApiResponse({
     status: 200,
-    description: '登录成功',
-    type: UserLoginResponseDto,
+    description: '登录成功-返回PendingToken',
+    type: PendingLoginResponseDto,
   })
   async login(@Body('pwd') pwd: string, @Body('account') account: string) {
     const res = await this.authService.login(pwd, account);
@@ -44,8 +59,8 @@ export class AuthController {
   @ApiOperation({ summary: '用户注册-用户端' })
   @ApiResponse({
     status: 200,
-    description: '注册成功',
-    type: UserRegisterResponseDto,
+    description: '注册成功-返回PendingToken',
+    type: PendingLoginResponseDto,
   })
   async register(@Body() registerUserDto: RegisterUserDto) {
     const res = await this.authService.register(registerUserDto);
@@ -64,6 +79,58 @@ export class AuthController {
     const userProfile =
       await this.authService.verifyTokenWithProfile(accessToken);
     return Result.success('Token有效', { valid: true, userProfile });
+  }
+
+  @ApiBearerAuth()
+  @Post('selectSchool')
+  @ApiOperation({ summary: '选择学校换发业务Token (需携带PendingToken)' })
+  @ApiResponse({ status: 200, type: SelectSchoolResponseDto })
+  async selectSchool(
+    @Headers('authorization') authHeader: string,
+    @Body() dto: SelectSchoolDto,
+  ) {
+    if (!authHeader) throw new HttpException('缺失Token', HttpStatus.UNAUTHORIZED);
+    const token = authHeader.split(' ')[1];
+    const res = await this.authService.selectSchool(token, dto);
+    return Result.success('选择学校成功', res);
+  }
+
+  @ApiBearerAuth()
+  @Post('switchSchool')
+  @ApiOperation({ summary: '切换学校换发业务Token (需携带AccessToken)' })
+  @ApiResponse({ status: 200, type: SwitchSchoolResponseDto })
+  async switchSchool(
+    @Headers('authorization') authHeader: string,
+    @Body() dto: SwitchSchoolDto,
+  ) {
+    if (!authHeader) throw new HttpException('缺失Token', HttpStatus.UNAUTHORIZED);
+    const token = authHeader.split(' ')[1];
+    const res = await this.authService.switchSchool(token, dto);
+    return Result.success('切换学校成功', res);
+  }
+
+  @ApiBearerAuth()
+  @Get('schools')
+  @ApiOperation({ summary: '获取可选学校列表' })
+  async listSelectableSchools(@Headers('authorization') authHeader: string) {
+    if (!authHeader) throw new HttpException('缺失Token', HttpStatus.UNAUTHORIZED);
+    const token = authHeader.split(' ')[1];
+    const res = await this.authService.listSelectableSchools(token);
+    return Result.success('获取列表成功', res);
+  }
+
+  @ApiBearerAuth()
+  @Post('join-school')
+  @ApiOperation({ summary: '通过邀请码加入学校' })
+  @ApiResponse({ status: 200, type: JoinSchoolByInviteCodeResponseDto })
+  async joinSchoolByInviteCode(@Body() dto: JoinSchoolByInviteCodeDto) {
+    const userId = this.alsService.getUserId();
+    if (!userId) throw new HttpException('未登录', HttpStatus.UNAUTHORIZED);
+    const res = await this.invitationService.joinSchoolByInviteCode(
+      userId,
+      dto.code,
+    );
+    return Result.success('加入学校成功', res);
   }
 
   @Public()

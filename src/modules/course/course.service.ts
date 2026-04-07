@@ -1765,6 +1765,13 @@ export class CourseService {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 10;
 
+    const teacherId = this.alsService.getActorId();
+    const schoolId = this.alsService.getSchoolId();
+
+    if (!teacherId || !schoolId) {
+      throw new ForbiddenException('应用上下文缺失，请重新登录选校');
+    }
+
     const baseQb = this.courseGroupTeacherRepository
       .createQueryBuilder('cgt')
       .innerJoin(CourseTeachingGroup, 'ctg', 'ctg.id = cgt.group_id')
@@ -1782,16 +1789,11 @@ export class CourseService {
         'school.name AS school_name',
         'cgt.group_id AS group_id',
       ])
-      .where('cgt.teacher_id = :teacherId', { teacherId: query.teacher_id })
+      .where('cgt.teacher_id = :teacherId', { teacherId })
       .andWhere('course.status = :status', {
         status: CourseStatusMap.PUBLISHED,
-      });
-
-    if (query.school_id) {
-      baseQb.andWhere('course.school_id = :schoolId', {
-        schoolId: query.school_id,
-      });
-    }
+      })
+      .andWhere('course.school_id = :schoolId', { schoolId });
 
     const total = await baseQb.getCount();
     const rows = await baseQb
@@ -1939,6 +1941,13 @@ export class CourseService {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 10;
 
+    const studentId = this.alsService.getActorId();
+    const schoolId = this.alsService.getSchoolId();
+
+    if (!studentId || !schoolId) {
+      throw new ForbiddenException('应用上下文缺失，请重新登录选校');
+    }
+
     const baseQb = this.courseStudentRepository
       .createQueryBuilder('cs')
       .innerJoin(Course, 'course', 'course.id = cs.course_id')
@@ -1955,13 +1964,8 @@ export class CourseService {
         'school.name AS school_name',
         'cs.group_id AS group_id',
       ])
-      .where('cs.student_id = :studentId', { studentId: query.student_id });
-
-    if (query.school_id) {
-      baseQb.andWhere('course.school_id = :schoolId', {
-        schoolId: query.school_id,
-      });
-    }
+      .where('cs.student_id = :studentId', { studentId })
+      .andWhere('course.school_id = :schoolId', { schoolId });
 
     const total = await baseQb.getCount();
     const rows = await baseQb
@@ -2717,18 +2721,13 @@ export class CourseService {
 
   async syncLearningProgress(dto: SyncProgressDto): Promise<any> {
     const userId = this.alsService.getUserId();
-    if (!userId) {
-      throw new ForbiddenException('未登录');
-    }
-    const { courseId, chapterId, lessonId, progress_percent, schoolId } = dto;
-    const student = await this.dataSource
-      .getRepository(Student)
-      .findOne({ where: { user_id: userId, school_id: schoolId } });
+    const studentId = this.alsService.getActorId();
+    const schoolId = this.alsService.getSchoolId();
 
-    if (!student) {
-      throw new ForbiddenException('当前用户非该校学生，无法同步进度');
+    if (!userId || !studentId || !schoolId) {
+      throw new ForbiddenException('应用上下文缺失，请重新登录选校');
     }
-    const studentId = student.id;
+    const { courseId, chapterId, lessonId, progress_percent } = dto;
 
     const existingRecord = await this.courseLearningRecordRepository.findOne({
       where: {
@@ -2793,18 +2792,13 @@ export class CourseService {
     dto: GetCourseLearningProgressDto,
   ): Promise<CourseLearningProgressResponseDto> {
     const userId = this.alsService.getUserId();
-    if (!userId) {
-      throw new ForbiddenException('未登录');
-    }
-    const { courseId, schoolId } = dto;
-    const student = await this.dataSource
-      .getRepository(Student)
-      .findOne({ where: { user_id: userId, school_id: schoolId } });
+    const studentId = this.alsService.getActorId();
+    const schoolId = this.alsService.getSchoolId();
 
-    if (!student) {
-      throw new ForbiddenException('当前用户非该校学生，无法查询进度');
+    if (!userId || !studentId || !schoolId) {
+      throw new ForbiddenException('应用上下文缺失，请重新登录选校');
     }
-    const studentId = student.id;
+    const { courseId } = dto;
 
     // 1. 获取课程所有章节和课时
     const chapters = await this.courseChapterRepository.find({

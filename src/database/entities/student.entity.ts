@@ -21,10 +21,6 @@ export class Student {
   student_number: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  @ApiProperty({ description: '班级id' })
-  class_id: string;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
   @ApiProperty({ description: '学院' })
   college: string;
 
