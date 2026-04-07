@@ -54,6 +54,10 @@ export class AssignmentAnswerDetail {
   @ApiProperty({ description: '得分', required: false, example: '5.0' })
   score?: string;
 
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ description: '教师评语', required: false })
+  teacher_comment?: string;
+
   @Column({ type: 'varchar', length: 255, nullable: true })
   @ApiProperty({ description: '创建时间戳(s)', required: false })
   create_time?: string;

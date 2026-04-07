@@ -17,6 +17,17 @@
 - **JWT (@nestjs/jwt)**: 基于 JSON Web Token 的身份认证。
 - **bcrypt**: 密码哈希加密。
 - **AuthGuard**: 全局身份验证守卫。
+- **AdminAuth**: 专门用于平台/学校管理后台接口的装饰器（双 Token 验证）。
+
+### 身份认证规则 (重要)
+1. **用户端 (学生/教师)**:
+   - 接口归属于 `src/modules/student` 或 `src/modules/teacher`（或 `teacher/` 子目录）。
+   - **禁止**使用 `@AdminAuth()`。
+   - 使用 `@ApiBearerAuth()` 并在 `Controller` 或 `Method` 上使用 `@Role('student' | 'teacher')` 进行权限控制。
+2. **管理端 (平台管理员/学校管理员)**:
+   - 接口用于管理后台业务。
+   - **必须**使用 `@AdminAuth()` 装饰器。
+   - 用户端与管理端使用的 JWT 密钥与验证逻辑不同，不可混用。
 
 ### 核心功能与中间件
 - **AsyncLocalStorage**: 实现请求维度的上下文隔离，用于事务管理和日志追踪。

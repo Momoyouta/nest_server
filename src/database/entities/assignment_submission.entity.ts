@@ -30,6 +30,10 @@ export class AssignmentSubmission {
   @ApiProperty({ description: '学生ID' })
   student_id: string;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  @ApiProperty({ description: '教学组ID', required: false })
+  teaching_group_id?: string;
+
   @Column({
     type: 'tinyint',
     nullable: true,

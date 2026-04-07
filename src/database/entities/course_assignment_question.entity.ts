@@ -24,7 +24,7 @@ export class CourseAssignmentQuestion {
 
   @Column({ type: 'tinyint' })
   @ApiProperty({
-    description: '题型: 1-单选, 2-多选, 3-填空, 4-简答',
+    description: '题型: 1-单选, 2-多选, 3-判断, 4-填空, 5-简答',
     enum: CourseAssignmentQuestionTypeValues,
     example: CourseAssignmentQuestionTypeMap.SINGLE_CHOICE,
   })
@@ -48,6 +48,10 @@ export class CourseAssignmentQuestion {
   @Column({ type: 'int', default: 0 })
   @ApiProperty({ description: '排序值', default: 0 })
   sort_order: number;
+
+  @Column({ type: 'json', nullable: true })
+  @ApiProperty({ description: '题目解析(JSON)', required: false })
+  analysis?: Record<string, any> | Array<any>;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   @ApiProperty({ description: '创建时间戳(s)', required: false })

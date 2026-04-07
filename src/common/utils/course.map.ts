@@ -40,13 +40,14 @@ export const AssignmentSubmissionStatusValues = Object.values(
 /**
  * 题型编码映射
  * 来源: course_assignment_question.type COMMENT
- * '题型: 1-单选, 2-多选, 3-填空(客观题自动判分), 4-简答(主观题人工判分)'
+ * '题型: 1-单选, 2-多选, 3-判断, 4-填空, 5-简答'
  */
 export const CourseAssignmentQuestionTypeMap = {
   SINGLE_CHOICE: 1,
   MULTIPLE_CHOICE: 2,
-  FILL_IN_THE_BLANK: 3,
-  SHORT_ANSWER: 4,
+  JUDGE: 3,
+  FILL_IN_THE_BLANK: 4,
+  SHORT_ANSWER: 5,
 } as const;
 
 export const CourseAssignmentQuestionTypeValues = Object.values(
