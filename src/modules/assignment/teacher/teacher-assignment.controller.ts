@@ -15,6 +15,7 @@ import { AssignmentSubmissionsDto } from '../dto/assignment-submissions.dto';
 import { UploadQuestionImageDto } from '../dto/upload-question-image.dto';
 import { UpdateAssignmentDto } from '../dto/update-assignment.dto';
 import { GetSubjectiveAnswersDto } from '../dto/get-subjective-answers.dto';
+import { FinishGradingDto } from '../dto/finish-grading.dto';
 import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
 
 @ApiTags('教师-作业管理')
@@ -116,6 +117,14 @@ export class TeacherAssignmentController {
   async getSubjectiveAnswers(@Body() dto: GetSubjectiveAnswersDto) {
     await this.getUserIdOrThrow(); // 权限验证
     return this.assignmentService.getSubjectiveAnswers(dto);
+  }
+
+  @Post('submissions/finish-grading')
+  @ApiOperation({ summary: '手动标记批改完成' })
+  @ApiResponse({ status: 200, description: '操作成功' })
+  async finishGrading(@Body() dto: FinishGradingDto) {
+    await this.getUserIdOrThrow(); // 权限验证
+    return this.assignmentService.finishGrading(dto);
   }
 
   @Post('question/image/upload')

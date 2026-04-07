@@ -28,6 +28,7 @@ import { UploadQuestionImageDto } from './dto/upload-question-image.dto';
 import { UpdateAssignmentDto } from './dto/update-assignment.dto';
 import { UploadAnswerImageDto } from './dto/upload-answer-image.dto';
 import { GetSubjectiveAnswersDto } from './dto/get-subjective-answers.dto';
+import { FinishGradingDto } from './dto/finish-grading.dto';
 import { CourseAssignmentStatusMap, CourseAssignmentQuestionTypeMap, AssignmentSubmissionStatusMap } from '@/common/utils/course.map';
 import { Result } from '@/database/types/result.type';
 import * as path from 'path';
@@ -437,26 +438,19 @@ export class AssignmentService {
     const totalScore = allDetails.reduce((sum, d) => sum + Number(d.score || 0), 0);
     submission.total_score = String(totalScore);
 
-    // Check if fully graded (all subjective questions graded)
-    const questions = await this.questionRepo.find({ where: { assignment_id: submission.assignment_id } });
-    const subjectiveQuestions = questions.filter(q => q.type === CourseAssignmentQuestionTypeMap.FILL_IN_THE_BLANK || q.type === CourseAssignmentQuestionTypeMap.SHORT_ANSWER);
-    
-    let allGraded = true;
-    for (const sq of subjectiveQuestions) {
-      const sqDetail = allDetails.find(d => d.question_id === sq.id);
-      if (!sqDetail || sqDetail.score === null || sqDetail.score === undefined) {
-        allGraded = false;
-        break;
-      }
-    }
+    await this.submissionRepo.save(submission);
+    return Result.success('保存评分成功', null);
+  }
 
-    if (allGraded) {
-      submission.status = AssignmentSubmissionStatusMap.REVIEWED;
-      submission.grade_time = String(Math.floor(Date.now() / 1000));
-    }
+  async finishGrading(dto: FinishGradingDto) {
+    const submission = await this.submissionRepo.findOne({ where: { id: dto.submission_id } });
+    if (!submission) throw new NotFoundException('提交记录不存在');
+
+    submission.status = AssignmentSubmissionStatusMap.REVIEWED;
+    submission.grade_time = String(Math.floor(Date.now() / 1000));
 
     await this.submissionRepo.save(submission);
-    return Result.success('批改成功', null);
+    return Result.success('完成批改成功', null);
   }
 
   async getSubjectiveAnswers(dto: GetSubjectiveAnswersDto) {
