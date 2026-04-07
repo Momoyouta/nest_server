@@ -27,6 +27,7 @@ import { SubmissionResultDto } from './dto/submission-result.dto';
 import { UploadQuestionImageDto } from './dto/upload-question-image.dto';
 import { UpdateAssignmentDto } from './dto/update-assignment.dto';
 import { UploadAnswerImageDto } from './dto/upload-answer-image.dto';
+import { GetSubjectiveAnswersDto } from './dto/get-subjective-answers.dto';
 import { CourseAssignmentStatusMap, CourseAssignmentQuestionTypeMap, AssignmentSubmissionStatusMap } from '@/common/utils/course.map';
 import { Result } from '@/database/types/result.type';
 import * as path from 'path';
@@ -458,6 +459,55 @@ export class AssignmentService {
     return Result.success('批改成功', null);
   }
 
+  async getSubjectiveAnswers(dto: GetSubjectiveAnswersDto) {
+    const submission = await this.submissionRepo.findOne({ where: { id: dto.submission_id } });
+    if (!submission) throw new NotFoundException('提交记录不存在');
+
+    const questions = await this.questionRepo.find({
+      where: {
+        assignment_id: submission.assignment_id,
+        type: In([CourseAssignmentQuestionTypeMap.FILL_IN_THE_BLANK, CourseAssignmentQuestionTypeMap.SHORT_ANSWER])
+      },
+      order: { sort_order: 'ASC' }
+    });
+
+    if (questions.length === 0) {
+      return Result.success('该作业无主观题', {
+        course_id: submission.course_id,
+        assignment_id: submission.assignment_id,
+        submission_status: submission.status,
+        overall_comment: submission.teacher_comment,
+        questions: []
+      });
+    }
+
+    const details = await this.answerDetailRepo.find({
+      where: { submission_id: submission.id, question_id: In(questions.map(q => q.id)) }
+    });
+
+    const results = questions.map(q => {
+      const detail = details.find(d => d.question_id === q.id);
+      return {
+        question_id: q.id,
+        type: q.type,
+        content: q.content,
+        analysis: q.analysis,
+        score: q.score,
+        standard_answer: q.standard_answer,
+        student_answer: detail ? detail.student_answer : null,
+        earned_score: detail ? detail.score : null,
+        teacher_comment: detail ? detail.teacher_comment : null,
+      };
+    });
+
+    return Result.success('获取主观题作答成功', {
+      course_id: submission.course_id,
+      assignment_id: submission.assignment_id,
+      submission_status: submission.status,
+      questions: results
+    });
+  }
+
   // ====================== 学生端逻辑 ======================
 
   async getStudentAssignmentList(dto: StudentAssignmentListDto, userId: string) {
@@ -592,9 +642,9 @@ export class AssignmentService {
       if (!q) continue;
 
       if ([CourseAssignmentQuestionTypeMap.SINGLE_CHOICE, CourseAssignmentQuestionTypeMap.JUDGE].includes(q.type as any)) {
-        const sAns = (ans.student_answer as any)?.answer?.[0];
-        const cAns = (q.standard_answer as any)?.answer?.[0];
-        if (sAns === cAns && sAns !== undefined) {
+        const sAns = (ans.student_answer as any)?.option_index;
+        const cAns = (q.standard_answer as any)?.option_index;
+        if (sAns !== undefined && sAns !== null && sAns === cAns) {
           ans.is_correct = 1;
           ans.score = String(q.score);
         } else {
@@ -602,8 +652,8 @@ export class AssignmentService {
           ans.score = '0';
         }
       } else if (q.type === CourseAssignmentQuestionTypeMap.MULTIPLE_CHOICE) {
-        const sAnsArray: string[] = Array.isArray((ans.student_answer as any)?.answer) ? (ans.student_answer as any).answer : [];
-        const cAnsArray: string[] = Array.isArray((q.standard_answer as any)?.answer) ? (q.standard_answer as any).answer : [];
+        const sAnsArray: any[] = Array.isArray((ans.student_answer as any)?.option_indexes) ? (ans.student_answer as any).option_indexes : [];
+        const cAnsArray: any[] = Array.isArray((q.standard_answer as any)?.option_indexes) ? (q.standard_answer as any).option_indexes : [];
         sAnsArray.sort();
         cAnsArray.sort();
         if (sAnsArray.length > 0 && sAnsArray.length === cAnsArray.length && sAnsArray.every((val, index) => val === cAnsArray[index])) {

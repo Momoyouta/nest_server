@@ -14,6 +14,7 @@ import { GradeQuestionDto } from '../dto/grade-question.dto';
 import { AssignmentSubmissionsDto } from '../dto/assignment-submissions.dto';
 import { UploadQuestionImageDto } from '../dto/upload-question-image.dto';
 import { UpdateAssignmentDto } from '../dto/update-assignment.dto';
+import { GetSubjectiveAnswersDto } from '../dto/get-subjective-answers.dto';
 import { AsyncLocalstorageService } from '@/modules/async/async/asyncLocalstorage.service';
 
 @ApiTags('教师-作业管理')
@@ -107,6 +108,14 @@ export class TeacherAssignmentController {
   @ApiResponse({ status: 200, description: '获取提交列表成功' })
   async getSubmissions(@Body() dto: AssignmentSubmissionsDto) {
     return this.assignmentService.getSubmissions(dto);
+  }
+
+  @Post('submissions/subjective')
+  @ApiOperation({ summary: '根据提交记录ID获取主观题作答(仅供批改用)' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  async getSubjectiveAnswers(@Body() dto: GetSubjectiveAnswersDto) {
+    await this.getUserIdOrThrow(); // 权限验证
+    return this.assignmentService.getSubjectiveAnswers(dto);
   }
 
   @Post('question/image/upload')
