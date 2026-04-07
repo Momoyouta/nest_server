@@ -637,6 +637,9 @@ export class LessonVideoLibraryItemDto {
   @ApiProperty({ description: '文件ID（file_chunk.id）', example: 'uuid-v4' })
   fileId: string;
 
+  @ApiProperty({ description: '文件Hash', example: 'abc123md5' })
+  fileHash: string;
+
   @ApiProperty({
     description: '文件目录相对路径（不含文件名）',
     example: 'schools/school-uuid/resource_library/videos/ab/cd',

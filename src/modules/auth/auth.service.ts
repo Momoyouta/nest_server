@@ -33,7 +33,7 @@ export class AuthService {
     private readonly dataSource: DataSource,
     private readonly invitationService: InvitationService,
     private readonly userService: UserService,
-  ) {}
+  ) { }
 
   async login(pwd: string, account: string) {
     const user = await this.userRepository.findOne({
@@ -169,13 +169,13 @@ export class AuthService {
     }
 
     const selectableSchools = identities.map(identity => {
-       const school = schools.find(s => s.id === identity.school_id);
-       return {
-         schoolId: identity.school_id,
-         schoolName: school?.name || '未知学校',
-         actorType: identity.actor_type,
-         actorId: identity.actor_id,
-       };
+      const school = schools.find(s => s.id === identity.school_id);
+      return {
+        schoolId: identity.school_id,
+        schoolName: school?.name || '未知学校',
+        actorType: identity.actor_type,
+        actorId: identity.actor_id,
+      };
     });
 
     const tokenPayload: TokenPayloadDto = {
@@ -185,7 +185,7 @@ export class AuthService {
       tokenType: 'pending-school',
       selectableSchoolIds: schoolIds,
     };
-    
+
     const token = await this.jwtService.signAsync(
       { ...tokenPayload },
       { expiresIn: '10m' }
@@ -208,7 +208,7 @@ export class AuthService {
     if (payload.tokenType && payload.tokenType !== 'pending-school') {
       throw new HttpException('Token类型不匹配,需要pending-school', HttpStatus.BAD_REQUEST);
     }
-    
+
     const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
       where: { user_id: payload.userId, school_id: dto.schoolId, status: 1 }
     });
@@ -227,7 +227,7 @@ export class AuthService {
     };
     const accessToken = await this.jwtService.signAsync({ ...tokenPayload });
     const user = await this.userRepository.findOne({ where: { id: payload.userId } });
-    const userProfile = await this.userService.getSelfProfileInfo(payload.userId);
+    const userProfile = await this.userService.getSelfProfileInfo(payload.userId, dto.schoolId);
 
     return {
       token: accessToken,
@@ -252,7 +252,7 @@ export class AuthService {
     if (!identity) {
       throw new HttpException('无权访问该学校或身份不存在', HttpStatus.FORBIDDEN);
     }
-
+    console.log(dto.schoolId)
     const tokenPayload: TokenPayloadDto = {
       userId: payload.userId,
       roleIds: payload.roleIds,
@@ -284,20 +284,20 @@ export class AuthService {
     }
 
     return identities.map(identity => {
-       const school = schools.find(s => s.id === identity.school_id);
-       return {
-         schoolId: identity.school_id,
-         schoolName: school?.name || '未知学校',
-         actorType: identity.actor_type,
-         actorId: identity.actor_id,
-       };
+      const school = schools.find(s => s.id === identity.school_id);
+      return {
+        schoolId: identity.school_id,
+        schoolName: school?.name || '未知学校',
+        actorType: identity.actor_type,
+        actorId: identity.actor_id,
+      };
     });
   }
 
   async verifyTokenWithProfile(token: string): Promise<CurrentUserProfile> {
     try {
       const payload = await this.jwtService.verifyAsync<TokenPayloadDto>(token);
-      return await this.userService.getSelfProfileInfo(String(payload.userId));
+      return await this.userService.getSelfProfileInfo(String(payload.userId), payload.schoolId);
     } catch {
       throw new HttpException('token无效或已过期', HttpStatus.FORBIDDEN);
     }

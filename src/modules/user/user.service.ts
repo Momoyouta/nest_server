@@ -244,7 +244,7 @@ export class UserService {
     });
   }
 
-  async getSelfProfileInfo(id: string): Promise<CurrentUserProfile> {
+  async getSelfProfileInfo(id: string, schoolId?: string): Promise<CurrentUserProfile> {
     const user = await this.usersRepository.findOneBy({ id });
     if (!user) {
       throw new NotFoundException('用户不存在');
@@ -257,7 +257,51 @@ export class UserService {
     let studentInfo: CurrentStudentInfoDto | null = null;
     let schoolName = '';
 
-    if (roleIds.includes(AdminRolesMap.teacher)) {
+    // 如果提供了 schoolId，我们优先根据 user_school_identity 来确定具体的身份
+    if (schoolId) {
+      const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
+        where: { user_id: id, school_id: schoolId, status: 1 },
+      });
+
+      if (identity) {
+        const school = await this.dataSource
+          .getRepository(School)
+          .findOneBy({ id: schoolId });
+        schoolName = school?.name || '';
+
+        if (identity.actor_type === 1) {
+          // teacher
+          const teacher = await this.dataSource
+            .getRepository(Teacher)
+            .findOneBy({ id: identity.actor_id });
+          if (teacher) {
+            const { id: teacher_id, user_id, ...teacherRest } = teacher;
+            teacherInfo = {
+              ...teacherRest,
+              teacher_id,
+              school_name: schoolName,
+            } as any;
+          }
+        } else if (identity.actor_type === 2) {
+          // student
+          const student = await this.dataSource
+            .getRepository(Student)
+            .findOneBy({ id: identity.actor_id });
+          if (student) {
+            const { id: student_id, user_id, ...studentRest } = student;
+            studentInfo = {
+              ...studentRest,
+              student_id,
+              school_name: schoolName,
+            } as any;
+          }
+        }
+      }
+    }
+
+    // 如果没有找到对应的学校身份信息（或者没传 schoolId），则尝试从所有角色中搜索（原有逻辑，作为兼容）
+    if (!teacherInfo && !studentInfo) {
+      if (roleIds.includes(AdminRolesMap.teacher)) {
       const teacher = await this.dataSource.getRepository(Teacher).findOne({
         where: { user_id: id },
       });
@@ -295,6 +339,8 @@ export class UserService {
         };
         schoolName = school?.name || schoolName;
       }
+    }
+
     }
 
     const safeUser = { ...user } as CurrentUserInfoDto & {

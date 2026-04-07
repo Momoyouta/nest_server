@@ -223,10 +223,11 @@ export class UserController {
       throw new ForbiddenException('只能查询当前用户信息');
     }
 
-    const userService = this.userService as unknown as {
-      getSelfProfileInfo: (targetUserId: string) => Promise<CurrentUserProfile>;
-    };
-    return Result.success('查询成功', await userService.getSelfProfileInfo(id));
+    const schoolId = this.alsService.getSchoolId();
+    return Result.success(
+      '查询成功',
+      await this.userService.getSelfProfileInfo(id, schoolId),
+    );
   }
 
   @Get('findByIdOne/:id')

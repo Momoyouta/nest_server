@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, EntityManager } from 'typeorm';
+import { Repository, In, EntityManager, DataSource } from 'typeorm';
 import { CourseAssignment } from '@/database/entities/course_assignment.entity';
 import { CourseAssignmentQuestion } from '@/database/entities/course_assignment_question.entity';
 import { AssignmentSubmission } from '@/database/entities/assignment_submission.entity';
@@ -35,6 +35,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { env } from 'process';
 import { getFileStoreRoot } from '@/common/utils/file-path.map';
+import { AsyncLocalstorageService } from '../async/async/asyncLocalstorage.service';
+import { UserSchoolIdentity } from '@/database/entities/user_school_identity.entity';
 
 @Injectable()
 export class AssignmentService {
@@ -57,18 +59,28 @@ export class AssignmentService {
     private studentRepo: Repository<Student>,
     @InjectRepository(Course)
     private courseRepo: Repository<Course>,
-  ) {}
+    private readonly alsService: AsyncLocalstorageService,
+    private readonly dataSource: DataSource,
+  ) { }
 
   private async getTeacherId(userId: string): Promise<string> {
-    const teacher = await this.teacherRepo.findOne({ where: { user_id: userId } });
-    if (!teacher) throw new ForbiddenException('当前用户没有教师身份');
-    return teacher.id;
+    const schoolId = this.alsService.getSchoolId();
+    if (!schoolId) throw new ForbiddenException('未选择学校');
+    const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
+      where: { user_id: userId, school_id: schoolId, actor_type: 1, status: 1 }
+    });
+    if (!identity) throw new ForbiddenException('当前用户在该学校没有教师身份');
+    return identity.actor_id;
   }
 
   private async getStudentId(userId: string): Promise<string> {
-    const student = await this.studentRepo.findOne({ where: { user_id: userId } });
-    if (!student) throw new ForbiddenException('当前用户没有学生身份');
-    return student.id;
+    const schoolId = this.alsService.getSchoolId();
+    if (!schoolId) throw new ForbiddenException('未选择学校');
+    const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
+      where: { user_id: userId, school_id: schoolId, actor_type: 2, status: 1 }
+    });
+    if (!identity) throw new ForbiddenException('当前用户在该学校没有学生身份');
+    return identity.actor_id;
   }
 
   // ====================== 教师端逻辑 ======================
@@ -173,7 +185,7 @@ export class AssignmentService {
       where.teaching_group_id = dto.teaching_group_id;
     }
     const assignments = await this.assignmentRepo.find({ where, order: { create_time: 'DESC' } });
-    
+
     const results = await Promise.all(assignments.map(async (a) => {
       const qCount = await this.questionRepo.count({ where: { assignment_id: a.id } });
       return {
@@ -271,7 +283,7 @@ export class AssignmentService {
     const now = Math.floor(Date.now() / 1000);
     const studentsWhere: any = { course_id: assignment.course_id };
     if (groupCondition) studentsWhere.group_id = groupCondition;
-    
+
     const students = await this.courseStudentRepo.find({ where: studentsWhere });
     const studentIds = students.map(s => s.student_id);
 
@@ -279,7 +291,7 @@ export class AssignmentService {
       const submissions = await this.submissionRepo.find({ where: { assignment_id: assignment.id } });
       const submittedIds = submissions.map(s => s.student_id);
       const unsubmittedIds = studentIds.filter(id => !submittedIds.includes(id));
-      
+
       if (unsubmittedIds.length > 0) {
         const newSubmissions = unsubmittedIds.map(stId => {
           const sub = new AssignmentSubmission();
@@ -299,12 +311,12 @@ export class AssignmentService {
     if (groupCondition) subWhere.teaching_group_id = groupCondition;
 
     const allSubmissions = await this.submissionRepo.find({ where: subWhere });
-    
+
     const questions = await this.questionRepo.find({ where: { assignment_id: dto.assignment_id } });
     const questionStats: any[] = [];
 
     const submissionIds = allSubmissions.map(s => s.id);
-    const details = submissionIds.length > 0 
+    const details = submissionIds.length > 0
       ? await this.answerDetailRepo.find({ where: { submission_id: In(submissionIds) } })
       : [];
 
@@ -313,7 +325,7 @@ export class AssignmentService {
       const submitQCount = qDetails.length;
       let correctRate: number | null = null;
       let scoreRate = 0;
-      
+
       const totalScore = qDetails.reduce((sum, d) => sum + Number(d.score || 0), 0);
       if (submitQCount > 0 && q.score > 0) {
         scoreRate = totalScore / (q.score * submitQCount);
@@ -340,7 +352,7 @@ export class AssignmentService {
 
   async getSubmissions(dto: AssignmentSubmissionsDto) {
     const { assignment_id, teaching_group_id, studentName, isGraded, page = 1, pageSize = 10 } = dto;
-    
+
     // 1. 验证作业
     const assignment = await this.assignmentRepo.findOne({ where: { id: assignment_id } });
     if (!assignment) throw new NotFoundException('作业不存在');
@@ -384,8 +396,8 @@ export class AssignmentService {
         queryBuilder.andWhere('submission.status = :status', { status: AssignmentSubmissionStatusMap.REVIEWED });
       } else {
         // 待批改：包含 已提交待审 和 未提交(submission 为 null 或状态为 0)
-        queryBuilder.andWhere('(submission.status IS NULL OR submission.status IN (:...statuses))', { 
-          statuses: [AssignmentSubmissionStatusMap.NOT_SUBMITTED, AssignmentSubmissionStatusMap.SUBMITTED_PENDING_REVIEW] 
+        queryBuilder.andWhere('(submission.status IS NULL OR submission.status IN (:...statuses))', {
+          statuses: [AssignmentSubmissionStatusMap.NOT_SUBMITTED, AssignmentSubmissionStatusMap.SUBMITTED_PENDING_REVIEW]
         });
       }
     }
@@ -432,7 +444,7 @@ export class AssignmentService {
     const submission = await this.submissionRepo.findOne({ where: { id: dto.submission_id } });
     if (!submission) throw new NotFoundException('提交记录不存在');
     if (dto.overall_comment) submission.teacher_comment = dto.overall_comment;
-    
+
     // Recalculate total_score
     const allDetails = await this.answerDetailRepo.find({ where: { submission_id: dto.submission_id } });
     const totalScore = allDetails.reduce((sum, d) => sum + Number(d.score || 0), 0);
@@ -506,13 +518,14 @@ export class AssignmentService {
 
   async getStudentAssignmentList(dto: StudentAssignmentListDto, userId: string) {
     const studentId = await this.getStudentId(userId);
+    console.log(dto.course_id, userId, studentId)
     const courseStudent = await this.courseStudentRepo.findOne({ where: { course_id: dto.course_id, student_id: studentId } });
     if (!courseStudent) throw new NotFoundException('未加入该课程');
 
     const assignments = await this.assignmentRepo.find({
       where: [
         { course_id: dto.course_id, status: CourseAssignmentStatusMap.PUBLISHED, teaching_group_id: courseStudent.group_id },
-        { course_id: dto.course_id, status: CourseAssignmentStatusMap.PUBLISHED, teaching_group_id: null as any } 
+        { course_id: dto.course_id, status: CourseAssignmentStatusMap.PUBLISHED, teaching_group_id: null as any }
       ]
     });
 
@@ -617,14 +630,14 @@ export class AssignmentService {
   async submitAssignment(dto: SubmitAssignmentDto, userId: string) {
     const studentId = await this.getStudentId(userId);
     await this.saveDraft(dto, userId);
-    
+
     const submission = await this.submissionRepo.findOne({ where: { assignment_id: dto.assignment_id, student_id: studentId } });
     if (!submission) throw new NotFoundException('提交记录不存在');
     const questions = await this.questionRepo.find({ where: { assignment_id: dto.assignment_id } });
     const answers = await this.answerDetailRepo.find({ where: { submission_id: submission.id } });
 
     await this.autoGrade(submission, questions, answers);
-    
+
     return Result.success('提交成功', { submission_id: submission.id });
   }
 
@@ -670,7 +683,7 @@ export class AssignmentService {
     submission.status = hasSubjective ? AssignmentSubmissionStatusMap.SUBMITTED_PENDING_REVIEW : AssignmentSubmissionStatusMap.REVIEWED;
     submission.submit_time = String(Math.floor(Date.now() / 1000));
     if (!hasSubjective) submission.grade_time = submission.submit_time;
-    
+
     await this.submissionRepo.save(submission);
   }
 
@@ -720,7 +733,7 @@ export class AssignmentService {
     const ext = path.extname(file.originalname);
     const relativeUrl = `schools/${course.school_id}/courses/${dto.course_id}/images/${randomHash}${ext}`;
     const absolutePath = path.join(getFileStoreRoot(), relativeUrl);
-    
+
     fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
     fs.writeFileSync(absolutePath, file.buffer);
 
@@ -728,7 +741,7 @@ export class AssignmentService {
     resource.question_id = dto.question_id;
     resource.resource_type = dto.resource_type;
     resource.file_url = relativeUrl;
-    
+
     const saved = await this.resourceRepo.save(resource);
 
     return Result.success('上传成功', { resource_id: saved.id, file_url: saved.file_url });
@@ -740,11 +753,11 @@ export class AssignmentService {
     }
 
     const studentId = await this.getStudentId(userId);
-    
+
     // 1. 获取作业信息以拿到 course_id
     const assignment = await this.assignmentRepo.findOne({ where: { id: dto.assignment_id } });
     if (!assignment) throw new NotFoundException('作业不存在');
-    
+
     // 2. 获取课程信息以拿到 school_id
     const course = await this.courseRepo.findOne({ where: { id: assignment.course_id } });
     if (!course) throw new NotFoundException('课程不存在');
@@ -761,7 +774,7 @@ export class AssignmentService {
       submission.teaching_group_id = assignment.teaching_group_id || undefined;
       submission = await this.submissionRepo.save(submission);
     }
-    
+
     if ((submission.status ?? 0) >= AssignmentSubmissionStatusMap.SUBMITTED_PENDING_REVIEW) {
       throw new BadRequestException('作业已提交，无法修改。');
     }

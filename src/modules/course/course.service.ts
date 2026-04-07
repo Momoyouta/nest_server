@@ -90,6 +90,7 @@ import {
   FileChunkStatusMap,
   FileChunkTypeMap,
 } from '@/common/utils/file-chunk-admin.map';
+import { UserSchoolIdentity } from '@/database/entities/user_school_identity.entity';
 
 interface CourseListRowRaw {
   id: string;
@@ -127,6 +128,7 @@ interface GroupInvitationMetaRowRaw {
 
 interface LessonVideoLibraryRowRaw {
   fileId: string;
+  fileHash: string;
   fileName: string;
   targetPath: string;
 }
@@ -211,11 +213,11 @@ export class CourseService {
     );
     let creatorId = user.id;
     if (isSchoolAdmin) {
-      const schoolAdmin = await this.schoolAdminRepository.findOne({
-        where: { user_id: user.id },
+      const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
+        where: { user_id: user.id, school_id: schoolId, actor_type: 3, status: 1 }
       });
-      if (schoolAdmin) {
-        creatorId = schoolAdmin.id;
+      if (identity) {
+        creatorId = identity.actor_id;
       }
     }
 
@@ -259,10 +261,11 @@ export class CourseService {
     payload: CreateCourseTeacherDto,
   ): Promise<CreateCourseResponseDto> {
     const user = await this.getCurrentUserOrThrow();
-    const teacher = await this.teacherRepository.findOne({
-      where: { user_id: user.id },
+    const schoolId = this.alsService.getSchoolId();
+    const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
+      where: { user_id: user.id, school_id: schoolId, actor_type: 1, status: 1 }
     });
-    if (!teacher) {
+    if (!identity) {
       throw new ForbiddenException('仅教师可创建课程');
     }
 
@@ -272,8 +275,8 @@ export class CourseService {
         manager.getRepository(CourseTeachingGroup);
 
       const course = courseRepository.create({
-        school_id: teacher.school_id,
-        creator_id: teacher.id,
+        school_id: schoolId,
+        creator_id: identity.actor_id,
         name: payload.name,
         status: Number(CourseStatusMap.UNPUBLISHED),
         description: '课程简介待编辑...',
@@ -1391,6 +1394,7 @@ export class CourseService {
     const rows = await qb
       .select([
         'fc.id AS fileId',
+        'fc.file_hash AS fileHash',
         'fc.file_name AS fileName',
         'fc.target_path AS targetPath',
       ])
@@ -1402,6 +1406,7 @@ export class CourseService {
     const list: LessonVideoLibraryItemDto[] = rows.map((row) => ({
       fileName: String(row.fileName),
       fileId: String(row.fileId),
+      fileHash: String(row.fileHash),
       target_path: String(row.targetPath),
     }));
 
@@ -1572,10 +1577,11 @@ export class CourseService {
       if (userId) {
         const user = await this.userRepository.findOneBy({ id: userId });
         if (user && this.parseRoleIds(user).includes(AdminRolesMap.teacher)) {
-          const teacher = await this.teacherRepository.findOne({
-            where: { user_id: user.id },
+          const schoolId = this.alsService.getSchoolId();
+          const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
+            where: { user_id: user.id, school_id: schoolId, actor_type: 1, status: 1 }
           });
-          if (teacher && course.creator_id === teacher.id) {
+          if (identity && course.creator_id === identity.actor_id) {
             shouldShowDraft = true;
           }
         }
@@ -1919,10 +1925,11 @@ export class CourseService {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 10;
 
-    const teacher = await this.teacherRepository.findOne({
-      where: { user_id: userId },
+    const schoolId = this.alsService.getSchoolId();
+    const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
+      where: { user_id: userId, school_id: schoolId, actor_type: 1, status: 1 }
     });
-    const realCreatorId = teacher ? teacher.id : userId;
+    const realCreatorId = identity ? identity.actor_id : userId;
 
     const baseQb = this.courseRepository
       .createQueryBuilder('course')

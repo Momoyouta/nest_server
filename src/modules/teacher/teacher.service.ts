@@ -16,7 +16,8 @@ import { CourseGroupTeacher } from '../../database/entities/course_group_teacher
 import { InvitationCode } from '../../database/entities/invitation_code.entity';
 import { BaseQueryDto } from '../../common/dto/base-query.dto';
 import * as bcrypt from 'bcrypt';
-import { In } from 'typeorm';
+import { In, DataSource } from 'typeorm';
+import { UserSchoolIdentity } from '@/database/entities/user_school_identity.entity';
 
 @Injectable()
 export class TeacherService {
@@ -33,6 +34,7 @@ export class TeacherService {
     private invitationRepository: Repository<InvitationCode>,
     private readonly courseService: CourseService,
     private readonly alsService: AsyncLocalstorageService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async findAll(query: BaseQueryDto) {
@@ -168,33 +170,35 @@ export class TeacherService {
 
   async leaveCourse(courseId: string): Promise<{ success: boolean }> {
     const userId = this.alsService.getUserId();
-    if (!userId) {
-      throw new ForbiddenException('未登录');
+    const schoolId = this.alsService.getSchoolId();
+    if (!userId || !schoolId) {
+      throw new ForbiddenException('登录状态或学校上下文缺失');
     }
 
-    const teacher = await this.teacherRepository.findOne({
-      where: { user_id: userId },
+    const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
+      where: { user_id: userId, school_id: schoolId, actor_type: 1, status: 1 }
     });
-    if (!teacher) {
-      throw new NotFoundException('教师信息不存在');
+    if (!identity) {
+      throw new NotFoundException('当前学校教师身份不存在');
     }
 
-    await this.courseService.removeTeacherFromCourse(teacher.id, courseId);
+    await this.courseService.removeTeacherFromCourse(identity.actor_id, courseId);
 
     return { success: true };
   }
 
   async getMyGroups(courseId: string) {
     const userId = this.alsService.getUserId();
-    if (!userId) {
-      throw new ForbiddenException('未登录');
+    const schoolId = this.alsService.getSchoolId();
+    if (!userId || !schoolId) {
+      throw new ForbiddenException('登录状态或学校上下文缺失');
     }
 
-    const teacher = await this.teacherRepository.findOne({
-      where: { user_id: userId },
+    const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
+      where: { user_id: userId, school_id: schoolId, actor_type: 1, status: 1 }
     });
-    if (!teacher) {
-      throw new NotFoundException('教师信息不存在');
+    if (!identity) {
+      throw new NotFoundException('当前学校教师身份不存在');
     }
 
     // 1. 查找该教师在该课程中所属的教学组ID
@@ -202,7 +206,7 @@ export class TeacherService {
       .createQueryBuilder('gt')
       .innerJoin(CourseTeachingGroup, 'tg', 'gt.group_id = tg.id')
       .where('tg.course_id = :courseId', { courseId })
-      .andWhere('gt.teacher_id = :teacherId', { teacherId: teacher.id })
+      .andWhere('gt.teacher_id = :teacherId', { teacherId: identity.actor_id })
       .select('gt.group_id', 'groupId')
       .getRawMany();
 

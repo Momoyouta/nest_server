@@ -42,7 +42,7 @@ const isDevEnv = (process.env.NODE_ENV || 'dev') === 'dev';
         password: 'root',
         database: 'study_platform',
         autoLoadEntities: true,
-        logging: true,
+        logging: ['error'],
       }),
     }),
     UserModule,

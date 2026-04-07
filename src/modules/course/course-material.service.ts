@@ -25,6 +25,7 @@ import {
 } from '@/modules/course/dto/course-material.dto';
 import { PlatformAdminRoles, SchoolAdminRoles } from '@/common/utils/role.map';
 import { FilePathTemplate } from '@/common/utils/file-path.map';
+import { UserSchoolIdentity } from '@/database/entities/user_school_identity.entity';
 
 @Injectable()
 export class CourseMaterialService {
@@ -74,18 +75,22 @@ export class CourseMaterialService {
     // 2. 学校管理员
     const isSchoolAdmin = roleIds.some((r) => SchoolAdminRoles.includes(r));
     if (isSchoolAdmin) {
-      const admin = await this.schoolAdminRepo.findOneBy({ user_id: userId });
-      if (!admin || admin.school_id !== course.school_id) {
+      const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
+        where: { user_id: userId, school_id: course.school_id, actor_type: 3, status: 1 } // 3 为管理员
+      });
+      if (!identity) {
         throw new ForbiddenException('无权操作该校课程资料');
       }
-      return { userId, operatorId: admin.id, course };
+      return { userId, operatorId: identity.actor_id, course };
     }
 
     // 3. 教师
     const isTeacher = roleIds.includes('4'); // 4 为教师
     if (isTeacher) {
-      const teacher = await this.teacherRepo.findOneBy({ user_id: userId });
-      if (!teacher || teacher.school_id !== course.school_id) {
+      const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
+        where: { user_id: userId, school_id: course.school_id, actor_type: 1, status: 1 }
+      });
+      if (!identity) {
         throw new ForbiddenException('无权访问该校课程资料');
       }
 
@@ -95,7 +100,7 @@ export class CourseMaterialService {
           .createQueryBuilder('gt')
           .innerJoin('course_teaching_group', 'tg', 'tg.id = gt.group_id')
           .where('tg.course_id = :courseId', { courseId })
-          .andWhere('gt.teacher_id = :teacherId', { teacherId: teacher.id })
+          .andWhere('gt.teacher_id = :teacherId', { teacherId: identity.actor_id })
           .getOne();
 
         if (!inGroup) {
@@ -103,19 +108,19 @@ export class CourseMaterialService {
         }
       }
 
-      return { userId, operatorId: teacher.id, course };
+      return { userId, operatorId: identity.actor_id, course };
     }
 
     // 4. 学生
     const isStudent = roleIds.includes('3'); // 3 为学生
     if (isStudent && mode === 'view') {
-      const student = await this.studentRepo.findOne({
-        where: { user_id: userId },
+      const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
+        where: { user_id: userId, school_id: course.school_id, actor_type: 2, status: 1 }
       });
-      if (!student || student.school_id !== course.school_id) {
+      if (!identity) {
         throw new ForbiddenException('无权查看其他学校课程资料');
       }
-      return { userId, operatorId: student.id, course };
+      return { userId, operatorId: identity.actor_id, course };
     }
 
     throw new ForbiddenException('当前角色无权限操作资料');

@@ -141,20 +141,21 @@ export class InvitationService {
 
     const isTeacher = roleIds.includes(AdminRolesMap.teacher);
     if (isTeacher) {
-      const teacher = await this.teacherRepository.findOne({
-        where: { user_id: user.id },
+      const currentSchoolId = this.alsService.getSchoolId();
+      const identity = await this.userSchoolIdentityRepository.findOne({
+        where: { user_id: user.id, school_id: currentSchoolId, actor_type: 1, status: 1 }
       });
-      if (!teacher?.id) {
-        throw new ForbiddenException('当前用户不是教师');
+      if (!identity) {
+        throw new ForbiddenException('当前用户在该学校没有教师身份');
       }
-      if (teacher.school_id !== course.school_id) {
+      if (currentSchoolId !== course.school_id) {
         throw new ForbiddenException('教师无权为非本校课程发码');
       }
 
       const relation = await this.courseGroupTeacherRepository.findOne({
         where: {
           group_id: teachingGroup.id,
-          teacher_id: teacher.id,
+          teacher_id: identity.actor_id,
         },
       });
       if (!relation) {
@@ -216,11 +217,15 @@ export class InvitationService {
     userId: string,
     code: string,
   ): Promise<JoinCourseByInviteCodeResponseDto> {
-    const student = await this.studentRepository.findOne({
-      where: { user_id: userId },
+    const currentSchoolId = this.alsService.getSchoolId();
+    if (!currentSchoolId) {
+       throw new ForbiddenException('未进入学校上下文');
+    }
+    const identity = await this.userSchoolIdentityRepository.findOne({
+      where: { user_id: userId, school_id: currentSchoolId, actor_type: 2, status: 1 }
     });
-    if (!student) {
-      throw new NotFoundException('学生不存在');
+    if (!identity) {
+      throw new NotFoundException('当前学校身份不存在或非学生身份');
     }
 
     const inviteData = await this.getInviteDataPreferRedis(code);
@@ -240,12 +245,11 @@ export class InvitationService {
 
     // 学校校验
     if (
-      student.school_id &&
-      inviteData.school_id &&
-      String(student.school_id) !== String(inviteData.school_id)
-    ) {
-      throw new BadRequestException('邀请码所属学校与学生当前学校不匹配');
-    }
+        inviteData.school_id &&
+        String(identity.school_id) !== String(inviteData.school_id)
+      ) {
+        throw new BadRequestException('邀请码所属学校与当前学校不匹配');
+      }
 
     const course = await this.courseRepository.findOne({
       where: { id: inviteData.course_id },
@@ -268,7 +272,7 @@ export class InvitationService {
     const existing = await this.courseStudentRepository.findOne({
       where: {
         course_id: course.id,
-        student_id: student.id,
+        student_id: identity.actor_id,
       },
     });
     if (existing) {
@@ -277,7 +281,7 @@ export class InvitationService {
 
     const relation = this.courseStudentRepository.create({
       course_id: course.id,
-      student_id: student.id,
+      student_id: identity.actor_id,
       group_id: teachingGroup.id,
     });
     await this.courseStudentRepository.save(relation);
@@ -584,16 +588,17 @@ export class InvitationService {
     const isTeacher = roleIds.includes(AdminRolesMap.teacher);
 
     if (isSchoolAdmin) {
-      const schoolAdmin = await this.schoolAdminRepository.findOne({
-        where: { user_id: user.id },
+      const currentSchoolId = this.alsService.getSchoolId();
+      const identity = await this.userSchoolIdentityRepository.findOne({
+        where: { user_id: user.id, school_id: currentSchoolId, actor_type: 3, status: 1 }
       });
-      if (!schoolAdmin?.school_id) {
-        throw new BadRequestException('学校管理员未绑定学校');
+      if (!identity) {
+        throw new ForbiddenException('当前用户在该学校没有管理员身份');
       }
-      if (dto.school_id && dto.school_id !== schoolAdmin.school_id) {
+      if (dto.school_id && dto.school_id !== identity.school_id) {
         throw new ForbiddenException('无权对其他学校发码');
       }
-      return schoolAdmin.school_id;
+      return identity.school_id;
     }
 
     if (isPlatformAdmin) {
@@ -604,16 +609,17 @@ export class InvitationService {
     }
 
     if (isTeacher) {
-      const teacher = await this.teacherRepository.findOne({
-        where: { user_id: user.id },
+      const currentSchoolId = this.alsService.getSchoolId();
+      const identity = await this.userSchoolIdentityRepository.findOne({
+        where: { user_id: user.id, school_id: currentSchoolId, actor_type: 1, status: 1 }
       });
-      if (!teacher?.school_id) {
-        throw new BadRequestException('教师未绑定学校');
+      if (!identity) {
+        throw new ForbiddenException('当前用户在该学校没有教师身份');
       }
-      if (dto.school_id && dto.school_id !== teacher.school_id) {
+      if (dto.school_id && dto.school_id !== identity.school_id) {
         throw new ForbiddenException('教师无权对其他学校发码');
       }
-      return teacher.school_id;
+      return identity.school_id;
     }
 
     throw new ForbiddenException('当前用户无邀请码发放权限');

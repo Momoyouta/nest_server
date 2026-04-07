@@ -22,6 +22,7 @@ import {
 } from '@/modules/student/dto/join-course-by-invite.dto';
 import { DataSource, In } from 'typeorm';
 import { CourseService } from '../course/course.service';
+import { UserSchoolIdentity } from '@/database/entities/user_school_identity.entity';
 
 @Injectable()
 export class StudentService {
@@ -44,19 +45,20 @@ export class StudentService {
 
   async leaveCourse(courseId: string): Promise<{ success: boolean }> {
     const userId = this.alsService.getUserId();
-    if (!userId) {
-      throw new ForbiddenException('未登录');
+    const schoolId = this.alsService.getSchoolId();
+    if (!userId || !schoolId) {
+       throw new ForbiddenException('登录状态或学校上下文缺失');
     }
 
-    const student = await this.studentRepository.findOne({
-      where: { user_id: userId },
+    const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
+      where: { user_id: userId, school_id: schoolId, actor_type: 2, status: 1 }
     });
-    if (!student) {
-      throw new NotFoundException('学生信息不存在');
+    if (!identity) {
+      throw new NotFoundException('当前学校学生身份不存在');
     }
 
     const courseStudent = await this.courseStudentRepository.findOne({
-      where: { student_id: student.id, course_id: courseId },
+      where: { student_id: identity.actor_id, course_id: courseId },
     });
     if (!courseStudent) {
       throw new BadRequestException('未加入该课程');
@@ -65,14 +67,14 @@ export class StudentService {
     await this.dataSource.transaction(async (manager) => {
       // 1. 清理该学生在该课程下的所有数据 (学习记录、作业等)
       await this.courseService.clearStudentCourseData(
-        student.id,
+        identity.actor_id,
         courseId,
         manager,
       );
 
       // 2. 删除入班记录
       await manager.getRepository(CourseStudent).delete({
-        student_id: student.id,
+        student_id: identity.actor_id,
         course_id: courseId,
       });
     });

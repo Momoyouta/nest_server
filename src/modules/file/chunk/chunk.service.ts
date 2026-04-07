@@ -30,6 +30,8 @@ import { UploadChunkUserDto } from './dto/upload-chunk-user.dto';
 import { MergeChunkUserDto } from './dto/merge-chunk-user.dto';
 import { QueryFileUserDto } from './dto/query-file-user.dto';
 import { DownloadFileDto } from './dto/download-file.dto';
+import { UserSchoolIdentity } from '@/database/entities/user_school_identity.entity';
+import { DataSource } from 'typeorm';
 
 @Injectable()
 export class ChunkService {
@@ -46,6 +48,7 @@ export class ChunkService {
     private readonly courseRepository: Repository<Course>,
     private readonly uploadService: UploadService,
     private readonly alsService: AsyncLocalstorageService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -261,15 +264,16 @@ export class ChunkService {
    */
   private async validateCourseOwnership(courseId?: string): Promise<void> {
     const userId = this.alsService.getUserId();
-    if (!userId) {
-      throw new ForbiddenException('未登录');
+    const schoolId = this.alsService.getSchoolId();
+    if (!userId || !schoolId) {
+      throw new ForbiddenException('登录状态或学校上下文缺失');
     }
 
-    const teacher = await this.teacherRepository.findOne({
-      where: { user_id: userId },
+    const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
+      where: { user_id: userId, school_id: schoolId, actor_type: 1, status: 1 }
     });
-    if (!teacher) {
-      throw new ForbiddenException('仅教师可操作');
+    if (!identity) {
+      throw new ForbiddenException('仅本校教师可操作');
     }
 
     if (courseId !== undefined && courseId !== null) {
@@ -279,7 +283,7 @@ export class ChunkService {
       if (!course) {
         throw new NotFoundException('课程不存在');
       }
-      if (course.creator_id !== teacher.id) {
+      if (course.creator_id !== identity.actor_id) {
         throw new ForbiddenException('仅课程创建者可上传课程资源');
       }
     }
@@ -356,29 +360,24 @@ export class ChunkService {
   /** 用户端：分页查询文件（模糊搜索 + 学校校验） */
   async queryFilesUser(dto: QueryFileUserDto) {
     const userId = this.alsService.getUserId();
-    if (!userId) {
-      throw new ForbiddenException('未登录');
+    const currentSchoolId = this.alsService.getSchoolId();
+    if (!userId || !currentSchoolId) {
+      throw new ForbiddenException('登录状态或学校上下文缺失');
     }
 
     const { page = 1, pageSize = 10, filename, schoolId } = dto;
 
-    // 1. 获取用户所属学校
-    const [teacher, student] = await Promise.all([
-      this.teacherRepository.findOne({ where: { user_id: userId } }),
-      this.studentRepository.findOne({ where: { user_id: userId } }),
-    ]);
-
-    const userSchoolId = teacher?.school_id || student?.school_id;
-
-    // 2. 校验 schoolId 权限
-    if (!userSchoolId) {
-      // 如果没有绑定的学校，且不是管理员（管理员通常不通过这个接口查，或者走 admin 接口）
-      // 这里为严谨，如果没学校信息，则禁止查询
-      throw new ForbiddenException('当前用户未绑定学校，无权查询文件');
+    if (schoolId !== currentSchoolId) {
+      throw new ForbiddenException('无权查询其他学校的文件资源');
     }
 
-    if (schoolId !== userSchoolId) {
-      throw new ForbiddenException('无权查询其他学校的文件资源');
+    // 1. 校验当前用户在目标学校是否有身份（任一有效身份即可）
+    const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
+      where: { user_id: userId, school_id: schoolId, status: 1 }
+    });
+
+    if (!identity) {
+      throw new ForbiddenException('当前用户在该学校无权查询文件');
     }
 
     // 3. 构建查询条件 (仅查询状态为 done 的记录)
@@ -439,6 +438,11 @@ export class ChunkService {
 
     const { schoolId, fileHash } = dto;
 
+    const currentSchoolId = this.alsService.getSchoolId();
+    if (!userId || !currentSchoolId) {
+      throw new ForbiddenException('登录状态或学校上下文缺失');
+    }
+
     // 1. 判断是否为平台管理员
     const isPlatformAdmin = roleIds.some((roleId) =>
       PlatformAdminRoles.includes(roleId),
@@ -446,23 +450,16 @@ export class ChunkService {
 
     // 2. 权限校验
     if (!isPlatformAdmin) {
-      // 非平台管理员，必须校验 schoolId
-      // 获取用户所属学校 (可能是教师、学生或学校管理员)
-      const [teacher, student, schoolAdmin] = await Promise.all([
-        this.teacherRepository.findOne({ where: { user_id: userId } }),
-        this.studentRepository.findOne({ where: { user_id: userId } }),
-        this.schoolAdminRepository.findOne({ where: { user_id: userId } }),
-      ]);
-
-      const userSchoolId =
-        teacher?.school_id || student?.school_id || schoolAdmin?.school_id;
-
-      if (!userSchoolId) {
-        throw new ForbiddenException('当前用户未绑定学校，无权下载文件');
-      }
-
-      if (schoolId !== userSchoolId) {
+      if (schoolId !== currentSchoolId) {
         throw new ForbiddenException('无权下载其他学校的文件资源');
+      }
+      // 获取用户在该学校的身份
+      const identity = await this.dataSource.getRepository(UserSchoolIdentity).findOne({
+        where: { user_id: userId, school_id: schoolId, status: 1 }
+      });
+
+      if (!identity) {
+        throw new ForbiddenException('当前用户在该学校无权下载文件');
       }
     }
 
