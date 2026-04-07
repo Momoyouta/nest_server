@@ -62,11 +62,13 @@ src/
 │   └── types/           # 数据库相关类型
 ├── dto/                 # 全局 DTO 定义
 └── modules/             # 业务模块
+    ├── assignment/      # 作业系统
     ├── async/           # AsyncLocalStorage 服务
     ├── auth/            # 身份认证
     ├── common/          # 通用业务接口
     ├── course/          # 课程管理
     ├── file/            # 文件上传与存储
+    ├── file_admin/      # 管理端分片文件管理
     ├── invitation/      # 邀请码与关联任务
     ├── redis/           # Redis 模块
     ├── school/          # 学校管理
@@ -78,42 +80,51 @@ src/
 
 ## 静态文件存储fileStore结构
 ```
-\fileStore
-├── server.log                       
-├── schools\                         # 学校业务根目录
-│   └── {school_id}\                 # 租户隔离：特定学校 ID
-│       ├── avatars\                 # 学校特有标识/默认头像
-│       ├── resource_library\        # 🚀 核心变更：统一的校本资源库
-│       │   ├── videos\              # 所有教学视频统统放在这里（管理员离线导入 / 教师单文件上传）
-│       │   │   ├── {file_hash}.mp4  # 采用hash命名+目录分级
-│       │   │   └── bulk_import_temp\# 管理员批量上传的临时中转区
-│       │   ├── documents\           # 公共资料
-│       │   │   └── {file_hash}.*    # 采用hash命名+目录分级
-│       │   └── images\              # 图片资源
-|       ├── private\                 # 私有文件（证明等
-│       └── courses\                 # 课程数据
-│           └── {course_id}\
-|               ├── images\         # 图片资源
-|               |   └── banner.png     
-│               └── homework\        # 🚀 学生作业提交（不可共享，强绑定课程）
-│                   └── {homework_id}\
-│                       └── {submit_id}\
+fileStore/
+├── server.log
+├── schools/                              # 学校业务根目录
+│   └── {school_id}/                      # 租户隔离：特定学校 ID
+│       ├── avatars/                      # 学校特有标识/默认头像
+│       ├── resource_library/             # 校本资源库
+│       │   ├── videos/                   # 教学视频资源
+│       │   │   ├── {dir1}/{dir2}/{file_hash}.mp4
+│       │   │   └── bulk_import_temp/     # 管理员批量上传临时中转区
+│       │   ├── documents/                # 公共文档资料
+│       │   │   └── {dir1}/{dir2}/{file_hash}.*
+│       │   ├── images/                   # 图片资源
+│       │   │   └── {dir1}/{dir2}/{file_hash}.*
+│       │   └── materials/                # 课程资料聚合目录
+│       ├── private/                      # 学校私有文件（证明等）
+│       └── courses/                      # 课程数据
+│           └── {course_id}/
+│               ├── documents/            # 课程资料
+│               ├── images/
+│               │   └── banner.png
+│               └── homework/             # 学生作业提交（强绑定课程）
+│                   └── {homework_id}/
+│                       └── {submit_id}/
 │                           └── answer.png
-├── users\                           # 用户全局数据
-│   └── avatars\                     # 全平台用户个人头像
+├── users/
+│   └── avatars/
 │       └── {user_id}.png
-└── uploads\                         # 上传缓冲区 (维持不变，处理前端单次上传)
-    └── temp\
-	    ├── videos 
-	    |   └── {file_hash.mp4}  
-        ├── document
-	    |   └── {file_hash.mp4}  
-	    ├── images   
-	    |   └── {file_hash.png}                         
-        └── chunks\                  
-            └── {file_hash}\         
+└── uploads/                              # 上传缓冲区
+    └── temp/
+        ├── videos/
+        ├── document/
+        ├── images/
+        └── chunks/
+            └── {file_hash}/
                 └── metadata.json
 ```
+
+## 近期更新 (2026-03-23 ~ 2026-04-07)
+
+- 新增邀请码系统、用户账号管理与角色管理能力。
+- 课程管理持续增强：管理端课程 CRUD、课程查询/更新优化、课程大纲草稿/发布流程。
+- 文件体系重构：统一文件存储结构、管理端分片文件管理、课程资料管理。
+- 增加课程教学组与邀请码关联能力。
+- 增加视频播放进度记录能力。
+- 新增作业系统模块（教师发布、学生提交、批改相关能力）。
 
 ## 快速开始
 
@@ -128,15 +139,15 @@ pnpm install
 ### 3. 运行项目
 ```bash
 # 开发模式
-pnpm run start:dev
+pnpm run dev
 
 # 生产模式
 pnpm run build
-pnpm run start:prod
+pnpm run prod
 ```
 
 ### 4. API 文档
-启动项目后，访问 `http://localhost:3000/api` (根据配置的端口) 查看 Swagger 文档。
+启动项目后，访问 `http://localhost:3001/api` (或环境变量 PORT 对应端口) 查看 Swagger 文档。
 
 ## openspec 规范
 - 制定与实施方案时需严格遵守 `openspec/config.yaml` 文件。
