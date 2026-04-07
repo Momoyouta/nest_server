@@ -23,6 +23,7 @@ export class SchoolAdminService {
       name,
       phone,
       school_id,
+      schoolId,
       status,
     } = query as any;
     const qb = this.schoolAdminRepository.createQueryBuilder('school_admin');
@@ -40,8 +41,11 @@ export class SchoolAdminService {
     if (phone) {
       qb.andWhere('user.account LIKE :phone', { phone: `%${phone}%` });
     }
-    if (school_id) {
-      qb.andWhere('school_admin.school_id = :school_id', { school_id });
+    const finalSchoolId = schoolId || school_id;
+    if (finalSchoolId) {
+      qb.andWhere('school_admin.school_id = :school_id', {
+        school_id: finalSchoolId,
+      });
     }
 
     qb.skip((page - 1) * pageSize).take(pageSize);

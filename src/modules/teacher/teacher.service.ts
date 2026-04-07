@@ -43,6 +43,7 @@ export class TeacherService {
       name,
       phone,
       school_id,
+      schoolId,
       teacher_number,
       status,
     } = query as any;
@@ -66,8 +67,11 @@ export class TeacherService {
     if (phone) {
       qb.andWhere('user.account LIKE :phone', { phone: `%${phone}%` });
     }
-    if (school_id) {
-      qb.andWhere('teacher.school_id = :school_id', { school_id });
+    const finalSchoolId = schoolId || school_id;
+    if (finalSchoolId) {
+      qb.andWhere('teacher.school_id = :school_id', {
+        school_id: finalSchoolId,
+      });
     }
 
     qb.skip((page - 1) * pageSize).take(pageSize);

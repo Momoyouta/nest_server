@@ -9,4 +9,10 @@ export class BaseQueryDto {
 
   @ApiPropertyOptional({ description: '关键词查询' })
   keyword?: string;
+
+  @ApiPropertyOptional({ description: '学校ID' })
+  schoolId?: string;
+
+  @ApiPropertyOptional({ description: '学校ID (兼容历史版本)' })
+  school_id?: string;
 }
