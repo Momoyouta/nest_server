@@ -61,6 +61,9 @@ import {
   ListMyCreatedCoursesQueryDto,
   CourseUserListResponseDto,
   TeacherSimpleDto,
+  QueryLessonVideoLibraryDto,
+  LessonVideoLibraryResponseDto,
+  LessonVideoLibraryItemDto,
 } from '@/modules/course/dto/CourseAdmin.dto';
 import {
   ChapterProgressDto,
@@ -83,6 +86,10 @@ import {
   CourseOutlineSourceMap,
 } from '@/common/utils/course-outline.map';
 import { InvitationTypeMap } from '@/common/utils/invite-type.map';
+import {
+  FileChunkStatusMap,
+  FileChunkTypeMap,
+} from '@/common/utils/file-chunk-admin.map';
 
 interface CourseListRowRaw {
   id: string;
@@ -116,6 +123,12 @@ interface GroupInvitationMetaRowRaw {
   invitation_create_time: string | null;
   invitation_code: string | null;
   invitation_ttl: number | string | null;
+}
+
+interface LessonVideoLibraryRowRaw {
+  fileId: string;
+  fileName: string;
+  targetPath: string;
 }
 
 interface SyncTeachingGroupTeachersInput {
@@ -1322,6 +1335,79 @@ export class CourseService {
       course_id: course.id,
       lesson_id: payload.lesson.lesson_id,
       updated: true,
+    };
+  }
+
+  async queryLessonVideoLibraryAdmin(
+    query: QueryLessonVideoLibraryDto,
+  ): Promise<LessonVideoLibraryResponseDto> {
+    const user = await this.getCurrentUserOrThrow();
+    const course = await this.findCourseWithPermissionOrThrow(
+      query.course_id,
+      user,
+    );
+    return this.queryLessonVideoLibraryBySchool(course.school_id, query);
+  }
+
+  async queryLessonVideoLibraryUser(
+    query: QueryLessonVideoLibraryDto,
+  ): Promise<LessonVideoLibraryResponseDto> {
+    const user = await this.getCurrentUserOrThrow();
+    const course = await this.findCourseWithTeacherPermissionOrThrow(
+      query.course_id,
+      user.id,
+    );
+    return this.queryLessonVideoLibraryBySchool(course.school_id, query);
+  }
+
+  private async queryLessonVideoLibraryBySchool(
+    schoolId: string,
+    query: QueryLessonVideoLibraryDto,
+  ): Promise<LessonVideoLibraryResponseDto> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 10;
+    const keyword = query.filename?.trim();
+
+    const fileChunkRepo = this.dataSource.getRepository(FileChunk);
+    const qb = fileChunkRepo
+      .createQueryBuilder('fc')
+      .where('fc.school_id = :schoolId', { schoolId })
+      .andWhere('fc.status = :status', { status: FileChunkStatusMap.done })
+      .andWhere('fc.type = :type', { type: FileChunkTypeMap.VIDEO })
+      .andWhere('fc.target_path LIKE :schoolsPrefix', {
+        schoolsPrefix: 'schools/%',
+      })
+      .andWhere('fc.target_path LIKE :videoPathPrefix', {
+        videoPathPrefix: `schools/${schoolId}/resource_library/videos/%`,
+      });
+
+    if (keyword) {
+      qb.andWhere('fc.file_name LIKE :filename', {
+        filename: `%${keyword}%`,
+      });
+    }
+
+    const total = await qb.getCount();
+    const rows = await qb
+      .select([
+        'fc.id AS fileId',
+        'fc.file_name AS fileName',
+        'fc.target_path AS targetPath',
+      ])
+      .orderBy('fc.update_time', 'DESC')
+      .skip((page - 1) * pageSize)
+      .take(pageSize)
+      .getRawMany<LessonVideoLibraryRowRaw>();
+
+    const list: LessonVideoLibraryItemDto[] = rows.map((row) => ({
+      fileName: String(row.fileName),
+      fileId: String(row.fileId),
+      target_path: String(row.targetPath),
+    }));
+
+    return {
+      list,
+      total,
     };
   }
 

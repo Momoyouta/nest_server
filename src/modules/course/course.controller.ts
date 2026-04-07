@@ -61,6 +61,8 @@ import {
   ListTeacherCoursesQueryDto,
   ListStudentCoursesQueryDto,
   CourseUserListResponseDto,
+  QueryLessonVideoLibraryDto,
+  LessonVideoLibraryResponseDto,
 } from '@/modules/course/dto/CourseAdmin.dto';
 import {
   CourseLearningProgressResponseDto,
@@ -323,6 +325,35 @@ export class CourseController {
   async updateLessonQuickUser(@Body() payload: QuickUpdateLessonDto) {
     const data = await this.courseService.updateLessonQuickUser(payload);
     return Result.success('更新成功', data);
+  }
+
+  @Get('queryLessonVideoLibraryAdmin')
+  @AdminAuth()
+  @Role(...AdminRoles)
+  @ApiOperation({ summary: '课时编辑：分页查询学校资源库视频（管理端）' })
+  @ApiResponse({
+    status: 200,
+    description: '查询成功',
+    type: LessonVideoLibraryResponseDto,
+  })
+  async queryLessonVideoLibraryAdmin(
+    @Query() query: QueryLessonVideoLibraryDto,
+  ) {
+    const data = await this.courseService.queryLessonVideoLibraryAdmin(query);
+    return Result.success('查询成功', data);
+  }
+
+  @Get('queryLessonVideoLibrary')
+  @Role(AdminRolesMap.teacher)
+  @ApiOperation({ summary: '课时编辑：分页查询学校资源库视频（教师端）' })
+  @ApiResponse({
+    status: 200,
+    description: '查询成功',
+    type: LessonVideoLibraryResponseDto,
+  })
+  async queryLessonVideoLibrary(@Query() query: QueryLessonVideoLibraryDto) {
+    const data = await this.courseService.queryLessonVideoLibraryUser(query);
+    return Result.success('查询成功', data);
   }
 
   @Put('bindTeachingGroupTeachersAdmin')

@@ -5,6 +5,7 @@ import {
   IsArray,
   IsIn,
   IsInt,
+  Max,
   IsNotEmpty,
   IsObject,
   IsOptional,
@@ -594,6 +595,63 @@ export class CourseUserListResponseDto {
   list: CourseUserListItemDto[];
 
   @ApiProperty({ description: '总数', example: 100 })
+  @IsInt()
+  total: number;
+}
+
+export class QueryLessonVideoLibraryDto {
+  @ApiProperty({ description: '课程ID', example: 'course-uuid' })
+  @IsString()
+  @IsNotEmpty()
+  course_id: string;
+
+  @ApiPropertyOptional({ description: '页码', default: 1, example: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ description: '每页条数', default: 10, example: 10 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number = 10;
+
+  @ApiPropertyOptional({
+    description: '文件名关键词（模糊匹配）',
+    example: '第一章',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  filename?: string;
+}
+
+export class LessonVideoLibraryItemDto {
+  @ApiProperty({ description: '文件名', example: '第一章导学.mp4' })
+  fileName: string;
+
+  @ApiProperty({ description: '文件ID（file_chunk.id）', example: 'uuid-v4' })
+  fileId: string;
+
+  @ApiProperty({
+    description: '文件目录相对路径（不含文件名）',
+    example: 'schools/school-uuid/resource_library/videos/ab/cd',
+  })
+  target_path: string;
+}
+
+export class LessonVideoLibraryResponseDto {
+  @ApiProperty({ type: [LessonVideoLibraryItemDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LessonVideoLibraryItemDto)
+  list: LessonVideoLibraryItemDto[];
+
+  @ApiProperty({ description: '总数', example: 20 })
   @IsInt()
   total: number;
 }
