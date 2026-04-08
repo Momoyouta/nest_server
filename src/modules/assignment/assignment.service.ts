@@ -1,9 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, EntityManager, DataSource } from 'typeorm';
+import { Repository, In, EntityManager, DataSource, IsNull } from 'typeorm';
 import { CourseAssignment } from '@/database/entities/course_assignment.entity';
 import { CourseAssignmentQuestion } from '@/database/entities/course_assignment_question.entity';
 import { AssignmentSubmission } from '@/database/entities/assignment_submission.entity';
+import { CourseGroupTeacher } from '@/database/entities/course_group_teacher.entity';
 import { AssignmentAnswerDetail } from '@/database/entities/assignment_answer_detail.entity';
 import { CourseQuestionResource } from '@/database/entities/course_question_resource.entity';
 import { CourseStudent } from '@/database/entities/course_student.entity';
@@ -83,6 +84,13 @@ export class AssignmentService {
     return identity.actor_id;
   }
 
+  private async checkTeacherInGroup(teacherId: string, teachingGroupId: string) {
+    const joined = await this.dataSource.getRepository(CourseGroupTeacher).findOne({
+      where: { teacher_id: teacherId, group_id: teachingGroupId }
+    });
+    if (!joined) throw new ForbiddenException('您不属于该教学组，无权操作此教学组的作业');
+  }
+
   // ====================== 教师端逻辑 ======================
 
   async saveAssignment(dto: SaveAssignmentDto, userId: string) {
@@ -101,8 +109,13 @@ export class AssignmentService {
       assignment.status = CourseAssignmentStatusMap.DRAFT;
     }
 
+    if (dto.teaching_group_id) {
+      await this.checkTeacherInGroup(teacherId, dto.teaching_group_id);
+      assignment.teaching_group_id = dto.teaching_group_id;
+    } else {
+      assignment.teaching_group_id = undefined;
+    }
     assignment.course_id = dto.course_id;
-    assignment.teaching_group_id = dto.teaching_group_id || undefined;
     assignment.title = dto.title;
     assignment.description = dto.description;
     assignment.start_time = dto.start_time;
@@ -155,6 +168,7 @@ export class AssignmentService {
     }
 
     if (dto.teaching_group_id) {
+      await this.checkTeacherInGroup(teacherId, dto.teaching_group_id);
       assignment.teaching_group_id = dto.teaching_group_id;
     }
     assignment.status = CourseAssignmentStatusMap.PUBLISHED;
@@ -183,6 +197,10 @@ export class AssignmentService {
     const where: any = { course_id: dto.course_id, teacher_id: teacherId };
     if (dto.teaching_group_id) {
       where.teaching_group_id = dto.teaching_group_id;
+    } else {
+      // 如果未指定教学组，且老师在当前课程中有教学组，则默认只看全局作业以实现隔离
+      // (即如果老师属于某些组，不传组ID则只显示全局作业)
+      where.teaching_group_id = IsNull();
     }
     const assignments = await this.assignmentRepo.find({ where, order: { create_time: 'DESC' } });
 
@@ -202,9 +220,14 @@ export class AssignmentService {
   }
 
   async getAssignmentDetail(dto: AssignmentDetailDto, userId: string) {
-    await this.getTeacherId(userId); // Verify identity
+    const teacherId = await this.getTeacherId(userId); // Verify identity
     const assignment = await this.assignmentRepo.findOne({ where: { id: dto.assignment_id } });
     if (!assignment) throw new NotFoundException('作业不存在');
+
+    // 权限校验：如果作业有关联教学组，老师必须在其中
+    if (assignment.teaching_group_id) {
+      await this.checkTeacherInGroup(teacherId, assignment.teaching_group_id);
+    }
 
     const questions = await this.questionRepo.find({
       where: { assignment_id: dto.assignment_id },
@@ -218,9 +241,14 @@ export class AssignmentService {
   }
 
   async getAssignmentOverview(dto: AssignmentDetailDto, userId: string) {
-    await this.getTeacherId(userId); // Verify identity
+    const teacherId = await this.getTeacherId(userId); // Verify identity
     const assignment = await this.assignmentRepo.findOne({ where: { id: dto.assignment_id } });
     if (!assignment) throw new NotFoundException('作业不存在');
+
+    // 权限校验
+    if (assignment.teaching_group_id) {
+      await this.checkTeacherInGroup(teacherId, assignment.teaching_group_id);
+    }
 
     let displayStatus = '';
     if (assignment.status === CourseAssignmentStatusMap.DRAFT) {
