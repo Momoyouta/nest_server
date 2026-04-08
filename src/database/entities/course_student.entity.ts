@@ -1,5 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { BeforeInsert, Column, Entity, Index, PrimaryColumn } from 'typeorm';
+import {
+  BeforeInsert,
+  BeforeUpdate,
+  Column,
+  Entity,
+  Index,
+  PrimaryColumn,
+} from 'typeorm';
 import { v4 } from 'uuid';
 
 @Entity('course_student')
@@ -25,6 +32,10 @@ export class CourseStudent {
   @ApiPropertyOptional({ description: '加入时间戳(s)' })
   create_time?: string;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  @ApiPropertyOptional({ description: '更新时间戳(s)' })
+  update_time?: string;
+
   @Column({ type: 'int', nullable: true, default: 0 })
   @ApiPropertyOptional({ description: '已完成课时数' })
   completed_lesson_count?: number;
@@ -38,6 +49,13 @@ export class CourseStudent {
     if (!this.id) {
       this.id = v4();
     }
-    this.create_time = String(Math.floor(Date.now() / 1000));
+    const now = String(Math.floor(Date.now() / 1000));
+    this.create_time = now;
+    this.update_time = now;
+  }
+
+  @BeforeUpdate()
+  setUpdateTime() {
+    this.update_time = String(Math.floor(Date.now() / 1000));
   }
 }

@@ -2958,6 +2958,21 @@ export class CourseService {
       };
     });
 
+    // 4. 自动更新 course_student 表的进度
+    const progressPercent =
+      lessons.length > 0
+        ? Math.round((totalCompleted / lessons.length) * 100)
+        : 0;
+
+    const courseStudent = await this.courseStudentRepository.findOne({
+      where: { course_id: courseId, student_id: studentId },
+    });
+    if (courseStudent) {
+      courseStudent.completed_lesson_count = totalCompleted;
+      courseStudent.progress_percent = progressPercent;
+      await this.courseStudentRepository.save(courseStudent);
+    }
+
     return {
       total_lessons: lessons.length,
       total_completed: totalCompleted,
