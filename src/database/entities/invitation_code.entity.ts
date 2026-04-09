@@ -19,6 +19,10 @@ export class InvitationCode {
   @ApiPropertyOptional({ description: '学校ID' })
   school_id: string;
 
+  @Column({ name: 'college_id', type: 'varchar', length: 255, nullable: true })
+  @ApiPropertyOptional({ description: '学院ID' })
+  college_id: string;
+
   @Column({ type: 'varchar', length: 255, nullable: true })
   @ApiPropertyOptional({ description: '年级' })
   grade: string;

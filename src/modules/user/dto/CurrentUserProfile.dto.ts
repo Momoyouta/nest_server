@@ -43,11 +43,23 @@ export class CurrentTeacherInfoDto {
   @ApiPropertyOptional({ description: '学院' })
   college?: string;
 
+  @ApiPropertyOptional({ description: '学院名称' })
+  collegeName?: string;
+
   @ApiPropertyOptional({ description: '学校ID' })
   school_id?: string;
 
   @ApiPropertyOptional({ description: '学校名称' })
   school_name?: string;
+
+  @ApiPropertyOptional({ description: '学院ID' })
+  college_id?: string;
+
+  @ApiPropertyOptional({ description: '创建时间戳(s)' })
+  create_time?: string;
+
+  @ApiPropertyOptional({ description: '更新时间戳(s)' })
+  update_time?: string;
 }
 
 export class CurrentStudentInfoDto {
@@ -60,11 +72,26 @@ export class CurrentStudentInfoDto {
   @ApiPropertyOptional({ description: '学院' })
   college?: string;
 
+  @ApiPropertyOptional({ description: '学院名称' })
+  collegeName?: string;
+
   @ApiPropertyOptional({ description: '学校ID' })
   school_id?: string;
 
   @ApiPropertyOptional({ description: '学校名称' })
   school_name?: string;
+
+  @ApiPropertyOptional({ description: '学院ID' })
+  college_id?: string;
+
+  @ApiPropertyOptional({ description: '年级' })
+  grade?: string;
+
+  @ApiPropertyOptional({ description: '创建时间戳(s)' })
+  create_time?: string;
+
+  @ApiPropertyOptional({ description: '更新时间戳(s)' })
+  update_time?: string;
 }
 
 export class CurrentUserProfile {
@@ -85,6 +112,12 @@ export class CurrentUserProfile {
     type: () => CurrentStudentInfoDto,
   })
   studentInfo?: CurrentStudentInfoDto | null;
+
+  @ApiPropertyOptional({ description: '学院序号' })
+  college_id?: string;
+
+  @ApiPropertyOptional({ description: '学院名称' })
+  collegeName?: string;
 
   @ApiProperty({ description: '学校名称' })
   school_name: string;

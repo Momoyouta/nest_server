@@ -56,7 +56,7 @@ export class AuthService {
 
   async register(registerUserDto: RegisterUserDto) {
     const { account, inviteCode, role_id } = registerUserDto;
-
+    console.log(1)
     // 1. 验证角色 (仅允许教师和学生)
     if (
       role_id !== AdminRolesMap.teacher &&
@@ -81,7 +81,6 @@ export class AuthService {
       throw new HttpException('该账号已存在', HttpStatus.BAD_REQUEST);
     }
     registerUserDto.phone = registerUserDto.account;
-
     // 3. 强制校验邀请码：邀请码无效（不存在或已过期）则禁止注册
     const inviteData =
       await this.invitationService.getInviteDataPreferRedis(inviteCode);
@@ -91,7 +90,6 @@ export class AuthService {
         HttpStatus.BAD_REQUEST,
       );
     }
-
     // 4. 校验邀请码类型与请求角色是否匹配
     if (
       role_id === AdminRolesMap.teacher &&
@@ -110,6 +108,14 @@ export class AuthService {
         '邀请码类型与学生角色不匹配',
         HttpStatus.BAD_REQUEST,
       );
+    }
+
+    // 4.5 强制应用邀请码中锁定的属性 (学院、年级)
+    if (inviteData.college_id) {
+      (registerUserDto as any).college_id = inviteData.college_id;
+    }
+    if (inviteData.grade) {
+      (registerUserDto as any).grade = inviteData.grade;
     }
 
     // 5. 调用 UserService 进行创建
@@ -191,6 +197,16 @@ export class AuthService {
       { expiresIn: '10m' }
     );
 
+    let collegeId: string | undefined = undefined;
+    let collegeName: string | undefined = undefined;
+
+    // 如果只有一个待选学校，提前查出学院信息并返回
+    if (schoolIds.length === 1) {
+      const profile = await this.userService.getSelfProfileInfo(user.id, schoolIds[0]);
+      collegeId = profile.college_id;
+      collegeName = profile.collegeName;
+    }
+
     return {
       token,
       selectableSchools,
@@ -198,6 +214,8 @@ export class AuthService {
         userId: user.id,
         userRoles: userRoles,
         userName: user.name,
+        collegeId,
+        collegeName,
       }
     };
   }
@@ -236,6 +254,8 @@ export class AuthService {
         userRoles: payload.roles,
         userName: user?.name || '',
         schoolId: dto.schoolId,
+        collegeId: userProfile.studentInfo?.college_id || userProfile.teacherInfo?.college_id,
+        collegeName: userProfile.studentInfo?.collegeName || userProfile.teacherInfo?.collegeName,
       },
       userProfile,
     };
@@ -327,6 +347,10 @@ export class AuthService {
       };
       if (payload.schoolId) {
         baseInfo.schoolId = payload.schoolId;
+        // 补充学院信息
+        const profile = await this.userService.getSelfProfileInfo(payload.userId, payload.schoolId);
+        baseInfo.collegeId = profile.college_id;
+        baseInfo.collegeName = profile.collegeName;
       }
       return baseInfo;
     } catch (e) {
@@ -412,17 +436,27 @@ export class AuthService {
     );
 
     let schoolId: string | undefined = undefined;
+    let collegeId: string | undefined = undefined;
+    let collegeName: string | undefined = undefined;
     const roleIdArr = user.role_id ? user.role_id.split(',') : [];
     if (roleIdArr.includes(AdminRolesMap.student)) {
       const student = await this.dataSource
         .getRepository(Student)
-        .findOne({ where: { user_id: user.id } });
+        .findOne({ where: { user_id: user.id }, relations: ['college'] });
       if (student?.school_id) schoolId = String(student.school_id);
+      if (student?.college_id) {
+        collegeId = student.college_id;
+        collegeName = student.college?.name;
+      }
     } else if (roleIdArr.includes(AdminRolesMap.teacher)) {
       const teacher = await this.dataSource
         .getRepository(Teacher)
-        .findOne({ where: { user_id: user.id } });
+        .findOne({ where: { user_id: user.id }, relations: ['college'] });
       if (teacher?.school_id) schoolId = String(teacher.school_id);
+      if (teacher?.college_id) {
+        collegeId = teacher.college_id;
+        collegeName = teacher.college?.name;
+      }
     } else if (
       roleIdArr.includes(AdminRolesMap.school_admin) ||
       roleIdArr.includes(AdminRolesMap.school_root)
@@ -440,6 +474,8 @@ export class AuthService {
         userRoles: userRoles,
         userName: user.name,
         schoolId: schoolId,
+        collegeId,
+        collegeName,
       } as BaseUserInfo,
     };
   }
@@ -461,17 +497,27 @@ export class AuthService {
       }
 
       let schoolId: string | undefined = undefined;
+      let collegeId: string | undefined = undefined;
+      let collegeName: string | undefined = undefined;
       const roleIdArr = payload.roleIds ? payload.roleIds.split(',') : [];
       if (roleIdArr.includes(AdminRolesMap.student)) {
         const student = await this.dataSource
           .getRepository(Student)
-          .findOne({ where: { user_id: payload.userId } });
+          .findOne({ where: { user_id: payload.userId }, relations: ['college'] });
         if (student?.school_id) schoolId = String(student.school_id);
+        if (student?.college_id) {
+          collegeId = student.college_id;
+          collegeName = student.college?.name;
+        }
       } else if (roleIdArr.includes(AdminRolesMap.teacher)) {
         const teacher = await this.dataSource
           .getRepository(Teacher)
-          .findOne({ where: { user_id: payload.userId } });
+          .findOne({ where: { user_id: payload.userId }, relations: ['college'] });
         if (teacher?.school_id) schoolId = String(teacher.school_id);
+        if (teacher?.college_id) {
+          collegeId = teacher.college_id;
+          collegeName = teacher.college?.name;
+        }
       } else if (
         roleIdArr.includes(AdminRolesMap.school_admin) ||
         roleIdArr.includes(AdminRolesMap.school_root)
@@ -487,6 +533,8 @@ export class AuthService {
         userRoles: payload.roles,
         userName: user.name,
         schoolId: schoolId,
+        collegeId,
+        collegeName,
       };
     } catch (e) {
       throw new HttpException(

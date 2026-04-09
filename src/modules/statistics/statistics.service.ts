@@ -56,6 +56,7 @@ import {
   ContinueLearningDto,
   CourseSummaryDto,
   GradeHistoryItemDto,
+  GradeSummaryDto,
   LearningSummaryDto,
   LessonFunnelItemDto,
   PeopleSummaryDto,
@@ -82,6 +83,7 @@ import {
 } from '@/modules/statistics/dto/statistics-response.dto';
 import {
   PlatformOverviewQueryDto,
+  GradeStatisticsQueryDto,
   SchoolOverviewQueryDto,
   StatisticsDictionaryQueryDto,
   StatisticsTimeRangeQueryDto,
@@ -552,6 +554,110 @@ export class StatisticsService {
     return data.learningSummary;
   }
 
+  async getGradeSummary(
+    query: GradeStatisticsQueryDto,
+  ): Promise<GradeSummaryDto> {
+    const range = this.parseTimeRange(query);
+    const schoolId = await this.resolveSchoolId(query.schoolId);
+    const cacheKey = buildStatisticsCacheKey({
+      scope: 'school',
+      role: 'admin',
+      tenantId: schoolId,
+      metricSet: 'grade-summary',
+      startTime: range.startTime,
+      endTime: range.endTime,
+      extras: {
+        grade: query.grade,
+        collegeId: query.collegeId,
+      },
+    });
+
+    return this.withCache(cacheKey, 180, async () => {
+      // 1. 学生人数
+      const studentCountQb = this.userSchoolIdentityRepo
+        .createQueryBuilder('usi')
+        .innerJoin(Student, 'student', 'student.id = usi.actor_id')
+        .where('usi.school_id = :schoolId', { schoolId })
+        .andWhere('usi.actor_type = :studentType', { studentType: 2 })
+        .andWhere('usi.status = :activeStatus', { activeStatus: 1 })
+        .andWhere('student.grade = :grade', { grade: query.grade });
+
+      if (query.collegeId) {
+        studentCountQb.andWhere('student.college_id = :collegeId', {
+          collegeId: query.collegeId,
+        });
+      }
+      const studentCountRaw = await studentCountQb
+        .select('COUNT(DISTINCT usi.actor_id)', 'count')
+        .getRawOne<{ count: string }>();
+      const studentCount = this.toNumber(studentCountRaw?.count);
+
+      // 2. 平均课程进度
+      const progressQb = this.courseStudentRepo
+        .createQueryBuilder('cs')
+        .innerJoin(Student, 'student', 'student.id = cs.student_id')
+        .select('AVG(COALESCE(cs.progress_percent, 0))', 'avgProgress')
+        .where('student.school_id = :schoolId', { schoolId })
+        .andWhere('student.grade = :grade', { grade: query.grade });
+
+      if (query.collegeId) {
+        progressQb.andWhere('student.college_id = :collegeId', {
+          collegeId: query.collegeId,
+        });
+      }
+      this.applyStringTimestampRange(progressQb, 'cs.create_time', range);
+      const progressRaw = await progressQb.getRawOne<{ avgProgress: string }>();
+
+      // 3. 作业提交率 & 平均分
+      const submissionQb = this.assignmentSubmissionRepo
+        .createQueryBuilder('sub')
+        .innerJoin(Student, 'student', 'student.id = sub.student_id')
+        .select('COUNT(1)', 'totalCount')
+        .addSelect(
+          'SUM(CASE WHEN sub.status IN (:...submittedStatus) THEN 1 ELSE 0 END)',
+          'submittedCount',
+        )
+        .addSelect(
+          'AVG(CASE WHEN sub.status = :reviewedStatus THEN CAST(sub.total_score AS DECIMAL(10,2)) END)',
+          'avgScore',
+        )
+        .where('student.school_id = :schoolId', { schoolId })
+        .andWhere('student.grade = :grade', { grade: query.grade })
+        .setParameters({
+          submittedStatus: [
+            AssignmentSubmissionStatusMap.SUBMITTED_PENDING_REVIEW,
+            AssignmentSubmissionStatusMap.REVIEWED,
+          ],
+          reviewedStatus: AssignmentSubmissionStatusMap.REVIEWED,
+        });
+
+      if (query.collegeId) {
+        submissionQb.andWhere('student.college_id = :collegeId', {
+          collegeId: query.collegeId,
+        });
+      }
+      this.applyStringTimestampRange(submissionQb, 'sub.create_time', range);
+      const submissionRaw = await submissionQb.getRawOne<{
+        totalCount: string;
+        submittedCount: string;
+        avgScore: string;
+      }>();
+
+      const totalHomework = this.toNumber(submissionRaw?.totalCount);
+      const submittedHomework = this.toNumber(submissionRaw?.submittedCount);
+
+      return {
+        avgScore: this.toNumber(submissionRaw?.avgScore),
+        submissionRate:
+          totalHomework > 0
+            ? this.toFixedNumber(submittedHomework / totalHomework)
+            : 0,
+        avgProgress: this.toFixedNumber(this.toNumber(progressRaw?.avgProgress), 2),
+        studentCount,
+      };
+    });
+  }
+
   private async buildSchoolSnapshot(
     query: SchoolOverviewQueryDto,
   ): Promise<SchoolOverviewDto> {
@@ -592,24 +698,26 @@ export class StatisticsService {
             SUM(t.studentCount) AS studentCount
           FROM (
             SELECT
-              COALESCE(teacher.college, '未分配') AS college,
+              COALESCE(college.name, '未分配') AS college,
               COUNT(DISTINCT usi.actor_id) AS teacherCount,
               0 AS studentCount
             FROM user_school_identity usi
             INNER JOIN teacher ON teacher.id = usi.actor_id
+            LEFT JOIN college ON college.id = teacher.college_id
             WHERE usi.school_id = ? AND usi.actor_type = 1 AND usi.status = 1
-            GROUP BY COALESCE(teacher.college, '未分配')
+            GROUP BY COALESCE(college.name, '未分配')
 
             UNION ALL
 
             SELECT
-              COALESCE(student.college, '未分配') AS college,
+              COALESCE(college.name, '未分配') AS college,
               0 AS teacherCount,
               COUNT(DISTINCT usi.actor_id) AS studentCount
             FROM user_school_identity usi
             INNER JOIN student ON student.id = usi.actor_id
+            LEFT JOIN college ON college.id = student.college_id
             WHERE usi.school_id = ? AND usi.actor_type = 2 AND usi.status = 1
-            GROUP BY COALESCE(student.college, '未分配')
+            GROUP BY COALESCE(college.name, '未分配')
           ) t
           GROUP BY t.college
           ORDER BY (SUM(t.teacherCount) + SUM(t.studentCount)) DESC

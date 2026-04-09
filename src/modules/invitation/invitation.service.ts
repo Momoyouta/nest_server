@@ -43,6 +43,7 @@ import { Student } from '@/database/entities/student.entity';
 import { CourseStudent } from '@/database/entities/course_student.entity';
 import { UserSchoolIdentity } from '@/database/entities/user_school_identity.entity';
 import { JoinSchoolByInviteCodeResponseDto } from '../auth/dto/join-school-by-invite.dto';
+import { College } from '@/database/entities/college.entity';
 
 @Injectable()
 export class InvitationService {
@@ -79,15 +80,35 @@ export class InvitationService {
   async createInvite(dto: CreateInviteDto, creatorId: string): Promise<string> {
     const now = String(Math.floor(Date.now() / 1000));
 
-    const invitationData: InvitationDataDto = {
+    // 根据类型强制校验并清理字段
+    const trimmedData: Partial<InvitationDataDto> = {
       type: dto.type,
       school_id: dto.school_id,
-      grade: dto.grade,
-      class_id: dto.class_id,
       creater_id: creatorId,
       create_time: now,
       ttl: dto.ttl,
     };
+
+    if (dto.type === InvitationTypeMap.STUDENT_JOIN_SCHOOL) {
+      if (!dto.grade || !dto.college_id) {
+        throw new BadRequestException('学生加入学校邀请码必须包含年级和学院ID');
+      }
+      trimmedData.grade = dto.grade;
+      trimmedData.college_id = dto.college_id;
+    } else if (dto.type === InvitationTypeMap.TEACHER_JOIN_SCHOOL) {
+      if (!dto.college_id) {
+        throw new BadRequestException('老师加入学校邀请码必须包含学院ID');
+      }
+      trimmedData.college_id = dto.college_id;
+    } else if (dto.type === InvitationTypeMap.STUDENT_JOIN_COURSE) {
+      if (!dto.teaching_group_id) {
+        throw new BadRequestException('学生加入课程邀请码必须包含教学组ID');
+      }
+      trimmedData.course_id = dto.course_id;
+      trimmedData.teaching_group_id = dto.teaching_group_id;
+    }
+
+    const invitationData = trimmedData as InvitationDataDto;
 
     // 使用加密逻辑生成邀请码
     const code = generateInviteCode(invitationData);
@@ -95,13 +116,7 @@ export class InvitationService {
     // 1. 存储到数据库
     const invite = this.invitationRepository.create({
       code,
-      type: dto.type,
-      school_id: dto.school_id,
-      grade: dto.grade,
-      class_id: dto.class_id,
-      creater_id: creatorId,
-      create_time: now,
-      ttl: dto.ttl,
+      ...trimmedData,
     });
     await this.invitationRepository.save(invite);
 
@@ -356,6 +371,7 @@ export class InvitationService {
           teacher = teacherRepo.create({
             user_id: userId,
             school_id: schoolId,
+            college_id: inviteData.college_id,
           });
           await teacherRepo.save(teacher);
         }
@@ -369,6 +385,8 @@ export class InvitationService {
           student = studentRepo.create({
             user_id: userId,
             school_id: schoolId,
+            college_id: inviteData.college_id,
+            grade: inviteData.grade,
           });
           await studentRepo.save(student);
         }
@@ -413,24 +431,28 @@ export class InvitationService {
       code,
       creater_id,
       school_id,
-      class_id,
+      college_id,
+      collegeName,
       grade,
       course_id,
       teaching_group_id,
       type,
+      status,
     } = query;
 
     const qb = this.invitationRepository
       .createQueryBuilder('ic')
       .leftJoin(School, 's', 'ic.school_id = s.id')
       .leftJoin(User, 'u', 'ic.creater_id = u.id')
+      .leftJoin(College, 'c', 'ic.college_id = c.id')
       .select([
         'ic.code as code',
         'ic.type as type',
         'ic.school_id as school_id',
         's.name as school_name',
+        'ic.college_id as college_id',
+        'c.name as college_name',
         'ic.grade as grade',
-        'ic.class_id as class_id',
         'ic.course_id as course_id',
         'ic.teaching_group_id as teaching_group_id',
         'ic.creater_id as creater_id',
@@ -442,7 +464,10 @@ export class InvitationService {
     if (code) qb.andWhere('ic.code LIKE :code', { code: `%${code}%` });
     if (creater_id) qb.andWhere('ic.creater_id = :creater_id', { creater_id });
     if (school_id) qb.andWhere('ic.school_id = :school_id', { school_id });
-    if (class_id) qb.andWhere('ic.class_id = :class_id', { class_id });
+    if (college_id) qb.andWhere('ic.college_id = :college_id', { college_id });
+    if (collegeName) {
+      qb.andWhere('c.name LIKE :collegeName', { collegeName: `%${collegeName}%` });
+    }
     if (grade) qb.andWhere('ic.grade LIKE :grade', { grade: `%${grade}%` });
     if (course_id) qb.andWhere('ic.course_id = :course_id', { course_id });
     if (teaching_group_id) {
@@ -451,6 +476,25 @@ export class InvitationService {
       });
     }
     if (type !== undefined) qb.andWhere('ic.type = :type', { type });
+
+    if (status !== undefined) {
+      const now = Math.floor(Date.now() / 1000);
+      if (Number(status) === 1) {
+        // 有效：未设置ttl，或者ttl=0，或者未过期
+        qb.andWhere(
+          '(ic.ttl IS NULL OR ic.ttl = 0 OR (CAST(ic.create_time AS UNSIGNED) + ic.ttl) > :now)',
+          { now },
+        );
+      } else {
+        // 无效：设置了ttl且已过期
+        qb.andWhere(
+          '(ic.ttl > 0 AND (CAST(ic.create_time AS UNSIGNED) + ic.ttl) <= :now)',
+          { now },
+        );
+      }
+    }
+
+    qb.orderBy('ic.create_time', 'DESC');
 
     const total = await qb.getCount();
     const list = await qb
@@ -642,6 +686,7 @@ export class InvitationService {
     return {
       type: Number(invite.type),
       school_id: String(invite.school_id || ''),
+      college_id: invite.college_id,
       grade: invite.grade,
       class_id: invite.class_id,
       course_id: invite.course_id,

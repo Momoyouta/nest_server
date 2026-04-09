@@ -2,42 +2,31 @@ import {
   Entity,
   Column,
   PrimaryGeneratedColumn,
-  OneToOne,
-  JoinColumn,
-  ManyToOne,
   BeforeInsert,
   BeforeUpdate,
 } from 'typeorm';
-import { User } from './user.entity';
-import { College } from './college.entity';
-import { ApiProperty } from '@nestjs/swagger';
 import { v4 } from 'uuid';
+import { ApiProperty } from '@nestjs/swagger';
+import { School } from './school.entity';
+import { ManyToOne, JoinColumn } from 'typeorm';
 
-@Entity('student')
-export class Student {
+@Entity('college')
+export class College {
   @PrimaryGeneratedColumn('uuid')
-  @ApiProperty({ description: '学生ID' })
+  @ApiProperty({ description: '学院ID' })
   id: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  @ApiProperty({ description: '学号' })
-  student_number: string;
+  @ApiProperty({ description: '学院名称' })
+  name: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  @ApiProperty({ description: '学院ID' })
-  college_id: string;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  @ApiProperty({ description: '年级' })
-  grade: string;
-
-  @Column()
-  @ApiProperty({ description: '所属用户ID' })
-  user_id: string;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  @ApiProperty({ description: '学校ID', required: false })
+  @ApiProperty({ description: '学校ID' })
   school_id: string;
+
+  @ManyToOne(() => School)
+  @JoinColumn({ name: 'school_id' })
+  school: School;
 
   @Column({ type: 'varchar', length: 20, nullable: true })
   @ApiProperty({ description: '创建时间戳 (s)', required: false })
@@ -46,14 +35,6 @@ export class Student {
   @Column({ type: 'varchar', length: 20, nullable: true })
   @ApiProperty({ description: '更新时间戳 (s)', required: false })
   update_time: string;
-
-  @OneToOne(() => User)
-  @JoinColumn({ name: 'user_id' })
-  user: User;
-
-  @ManyToOne(() => College)
-  @JoinColumn({ name: 'college_id' })
-  college: College;
 
   @BeforeInsert()
   generateIdAndCreateTime() {

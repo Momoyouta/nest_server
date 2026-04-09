@@ -110,6 +110,20 @@ export class LearningSummaryDto {
   avgScoreRate: number;
 }
 
+export class GradeSummaryDto {
+  @ApiProperty({ description: '平均分', example: 85.5 })
+  avgScore: number;
+
+  @ApiProperty({ description: '作业提交率', example: 0.88 })
+  submissionRate: number;
+
+  @ApiProperty({ description: '平均课程进度(%)', example: 72.5 })
+  avgProgress: number;
+
+  @ApiProperty({ description: '学生人数', example: 240 })
+  studentCount: number;
+}
+
 export class SchoolOverviewDto {
   @ApiProperty({ description: '人员概览', type: PeopleSummaryDto })
   peopleSummary: PeopleSummaryDto;

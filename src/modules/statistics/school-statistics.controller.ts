@@ -4,13 +4,17 @@ import { AdminAuth } from '@/common/decorators/admin-auth.decorator';
 import { Role } from '@/common/decorators/role.decorator';
 import { AdminRolesMap } from '@/common/utils/role.map';
 import { Result } from '@/database/types/result.type';
-import { SchoolOverviewQueryDto } from '@/modules/statistics/dto/statistics-query.dto';
 import {
   AssetSummaryDto,
   CourseSummaryDto,
+  GradeSummaryDto,
   LearningSummaryDto,
   PeopleSummaryDto,
 } from '@/modules/statistics/dto/statistics-response.dto';
+import {
+  GradeStatisticsQueryDto,
+  SchoolOverviewQueryDto,
+} from '@/modules/statistics/dto/statistics-query.dto';
 import { StatisticsService } from '@/modules/statistics/statistics.service';
 
 @ApiTags('统计看板-学校视角')
@@ -76,6 +80,21 @@ export class SchoolStatisticsController {
   @ApiResponse({ status: 200, description: '获取成功', type: LearningSummaryDto })
   async getLearningSummary(@Query() query: SchoolOverviewQueryDto) {
     const data = await this.statisticsService.getSchoolLearningSummary(query);
+    return Result.success('获取成功', data);
+  }
+
+  @Get('grade-summary')
+  @AdminAuth()
+  @Role(
+    AdminRolesMap.root,
+    AdminRolesMap.admin,
+    AdminRolesMap.school_root,
+    AdminRolesMap.school_admin,
+  )
+  @ApiOperation({ summary: '学校-年级概览' })
+  @ApiResponse({ status: 200, description: '获取成功', type: GradeSummaryDto })
+  async getGradeSummary(@Query() query: GradeStatisticsQueryDto) {
+    const data = await this.statisticsService.getGradeSummary(query);
     return Result.success('获取成功', data);
   }
 }

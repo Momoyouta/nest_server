@@ -43,6 +43,18 @@ export class SchoolOverviewQueryDto extends StatisticsTimeRangeQueryDto {
   schoolId?: string;
 }
 
+export class GradeStatisticsQueryDto extends SchoolOverviewQueryDto {
+  @ApiProperty({ description: '年级', example: '2023' })
+  @IsString({ message: 'grade 必须为字符串' })
+  @IsNotEmpty({ message: 'grade 不能为空' })
+  grade: string;
+
+  @ApiPropertyOptional({ description: '学院ID', example: 'college_uuid' })
+  @IsOptional()
+  @IsString()
+  collegeId?: string;
+}
+
 export class TeacherDashboardQueryDto extends StatisticsTimeRangeQueryDto {
   @ApiPropertyOptional({ description: '课程ID', example: 'course_uuid' })
   @IsOptional()

@@ -273,27 +273,39 @@ export class UserService {
           // teacher
           const teacher = await this.dataSource
             .getRepository(Teacher)
-            .findOneBy({ id: identity.actor_id });
+            .findOne({
+              where: { id: identity.actor_id },
+              relations: ['college'],
+            });
           if (teacher) {
-            const { id: teacher_id, user_id, ...teacherRest } = teacher;
+            const { id: teacher_id, user_id, college, ...teacherRest } = teacher;
             teacherInfo = {
               ...teacherRest,
               teacher_id,
+              college: college?.name || '',
+              collegeName: college?.name || '',
+              college_id: teacher.college_id,
               school_name: schoolName,
-            } as any;
+            };
           }
         } else if (identity.actor_type === 2) {
           // student
           const student = await this.dataSource
             .getRepository(Student)
-            .findOneBy({ id: identity.actor_id });
+            .findOne({
+              where: { id: identity.actor_id },
+              relations: ['college'],
+            });
           if (student) {
-            const { id: student_id, user_id, ...studentRest } = student;
+            const { id: student_id, user_id, college, ...studentRest } = student;
             studentInfo = {
               ...studentRest,
               student_id,
+              college: college?.name || '',
+              collegeName: college?.name || '',
+              college_id: student.college_id,
               school_name: schoolName,
-            } as any;
+            };
           }
         }
       }
@@ -302,58 +314,69 @@ export class UserService {
     // 如果没有找到对应的学校身份信息（或者没传 schoolId），则尝试从所有角色中搜索（原有逻辑，作为兼容）
     if (!teacherInfo && !studentInfo) {
       if (roleIds.includes(AdminRolesMap.teacher)) {
-      const teacher = await this.dataSource.getRepository(Teacher).findOne({
-        where: { user_id: id },
-      });
-      if (teacher) {
-        const school = teacher.school_id
-          ? await this.dataSource
-              .getRepository(School)
-              .findOneBy({ id: teacher.school_id })
-          : null;
-        const { id: teacher_id, user_id, ...teacherRest } = teacher;
-        teacherInfo = {
-          ...teacherRest,
-          teacher_id,
-          school_name: school?.name || '',
-        };
-        schoolName = school?.name || schoolName;
+        const teacher = await this.dataSource.getRepository(Teacher).findOne({
+          where: { user_id: id },
+          relations: ['college'],
+        });
+        if (teacher) {
+          const school = teacher.school_id
+            ? await this.dataSource
+                .getRepository(School)
+                .findOneBy({ id: teacher.school_id })
+            : null;
+          const { id: teacher_id, user_id, college, ...teacherRest } = teacher;
+          teacherInfo = {
+            ...teacherRest,
+            teacher_id,
+            college: college?.name || '',
+            collegeName: college?.name || '',
+            college_id: teacher.college_id,
+            school_name: school?.name || '',
+          };
+          schoolName = school?.name || schoolName;
+        }
       }
-    }
 
-    if (roleIds.includes(AdminRolesMap.student)) {
-      const student = await this.dataSource.getRepository(Student).findOne({
-        where: { user_id: id },
-      });
-      if (student) {
-        const school = student.school_id
-          ? await this.dataSource
-              .getRepository(School)
-              .findOneBy({ id: student.school_id })
-          : null;
-        const { id: student_id, user_id, ...studentRest } = student;
-        studentInfo = {
-          ...studentRest,
-          student_id,
-          school_name: school?.name || '',
-        };
-        schoolName = school?.name || schoolName;
+      if (roleIds.includes(AdminRolesMap.student)) {
+        const student = await this.dataSource.getRepository(Student).findOne({
+          where: { user_id: id },
+          relations: ['college'],
+        });
+        if (student) {
+          const school = student.school_id
+            ? await this.dataSource
+                .getRepository(School)
+                .findOneBy({ id: student.school_id })
+            : null;
+          const { id: student_id, user_id, college, ...studentRest } = student;
+          studentInfo = {
+            ...studentRest,
+            student_id,
+            college: college?.name || '',
+            collegeName: college?.name || '',
+            college_id: student.college_id,
+            school_name: school?.name || '',
+          };
+          schoolName = school?.name || schoolName;
+        }
       }
-    }
-
     }
 
     const safeUser = { ...user } as CurrentUserInfoDto & {
       password?: string;
     };
     delete safeUser.password;
-    return {
+    const profile: CurrentUserProfile = {
       user: safeUser,
       roles,
       teacherInfo,
       studentInfo,
       school_name: schoolName,
+      college_id: teacherInfo?.college_id || studentInfo?.college_id,
+      collegeName: teacherInfo?.collegeName || studentInfo?.collegeName,
     };
+
+    return profile;
   }
 
   async updateSelfBasic(
@@ -598,6 +621,7 @@ export class UserService {
       const teacher = manager.create(Teacher, {
         user_id: savedUser.id,
         school_id: schoolId,
+        college_id: (userData as any).college_id,
       });
       const savedTeacher = await manager.save(Teacher, teacher);
 
@@ -646,6 +670,8 @@ export class UserService {
       const student = manager.create(Student, {
         user_id: savedUser.id,
         school_id: schoolId,
+        college_id: (userData as any).college_id,
+        grade: (userData as any).grade,
       });
       const savedStudent = await manager.save(Student, student);
 

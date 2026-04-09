@@ -27,6 +27,7 @@ import { AssignmentAnswerDetail } from '@/database/entities/assignment_answer_de
 import { CourseMaterial } from '@/database/entities/course_material.entity';
 import { CourseQuestionResource } from '@/database/entities/course_question_resource.entity';
 import { UserSchoolIdentity } from '@/database/entities/user_school_identity.entity';
+import { College } from '@/database/entities/college.entity';
 
 const entities = [
   User,
@@ -53,6 +54,7 @@ const entities = [
   CourseMaterial,
   CourseQuestionResource,
   UserSchoolIdentity,
+  College,
 ];
 @Global()
 @Module({

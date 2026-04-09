@@ -24,6 +24,7 @@ const fieldMap: Record<string, string> = {
   creater_id: 'cr',
   create_time: 'ct',
   ttl: 'ttl',
+  college_id: 'ci',
 };
 
 // 反向映射

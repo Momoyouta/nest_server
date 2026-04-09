@@ -26,6 +26,11 @@ export class InvitationDataDto {
   @IsNotEmpty()
   school_id: string;
 
+  @ApiPropertyOptional({ description: '学院ID' })
+  @IsString()
+  @IsOptional()
+  college_id?: string;
+
   @ApiPropertyOptional({ description: '入学年份' })
   @IsString()
   @IsOptional()
@@ -75,6 +80,11 @@ export class CreateInviteDto {
   @IsString()
   @IsNotEmpty()
   school_id: string;
+
+  @ApiPropertyOptional({ description: '学院ID' })
+  @IsString()
+  @IsOptional()
+  college_id?: string;
 
   @ApiPropertyOptional({ description: '入学年份' })
   @IsString()
@@ -174,10 +184,15 @@ export class InvitationQueryDto {
   @IsString()
   school_id?: string;
 
-  @ApiPropertyOptional({ description: '班级ID' })
+  @ApiPropertyOptional({ description: '学院ID' })
   @IsOptional()
   @IsString()
-  class_id?: string;
+  college_id?: string;
+
+  @ApiPropertyOptional({ description: '学院名称' })
+  @IsOptional()
+  @IsString()
+  collegeName?: string;
 
   @ApiPropertyOptional({ description: '课程ID' })
   @IsOptional()
@@ -193,6 +208,11 @@ export class InvitationQueryDto {
   @IsOptional()
   @IsString()
   grade?: string;
+
+  @ApiPropertyOptional({ description: '状态 (1:有效, 0:无效)' })
+  @IsOptional()
+  @IsInt()
+  status?: number;
 
   @ApiPropertyOptional({ description: '类型' })
   @IsOptional()

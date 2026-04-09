@@ -23,6 +23,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { getFileStoreRoot } from '@/common/utils/file-path.map';
 import { AssignmentModule } from './modules/assignment/assignment.module';
 import { StatisticsModule } from '@/modules/statistics/statistics.module';
+import { CollegeModule } from './modules/college/college.module';
 
 const isDevEnv = (process.env.NODE_ENV || 'dev') === 'dev';
 
@@ -60,6 +61,7 @@ const isDevEnv = (process.env.NODE_ENV || 'dev') === 'dev';
     CourseModule,
     AssignmentModule,
     StatisticsModule,
+    CollegeModule,
     ...(isDevEnv
       ? [
           ServeStaticModule.forRoot({

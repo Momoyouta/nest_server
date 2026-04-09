@@ -24,6 +24,10 @@ export class UserSchoolInfoDto {
   userName: string;
   @ApiProperty({ description: '学校ID' })
   schoolId?: string;
+  @ApiProperty({ description: '学院ID' })
+  collegeId?: string;
+  @ApiProperty({ description: '学院名称' })
+  collegeName?: string;
 }
 
 export class PendingLoginResponseDto {

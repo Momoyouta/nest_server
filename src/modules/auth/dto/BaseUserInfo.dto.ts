@@ -12,4 +12,10 @@ export class BaseUserInfo {
 
   @ApiProperty({ description: '学校ID', example: '1', required: false })
   schoolId?: string;
+
+  @ApiProperty({ description: '学院ID', example: '1', required: false })
+  collegeId?: string;
+
+  @ApiProperty({ description: '学院名称', example: '计算机学院', required: false })
+  collegeName?: string;
 }

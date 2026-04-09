@@ -48,9 +48,11 @@ export class TeacherService {
       schoolId,
       teacher_number,
       status,
+      collegeName,
     } = query as any;
     const qb = this.teacherRepository.createQueryBuilder('teacher');
     qb.leftJoinAndSelect('teacher.user', 'user');
+    qb.leftJoinAndSelect('teacher.college', 'college');
 
     if (status) {
       qb.andWhere('user.status = :status', { status });
@@ -69,6 +71,11 @@ export class TeacherService {
     if (phone) {
       qb.andWhere('user.account LIKE :phone', { phone: `%${phone}%` });
     }
+    if (collegeName) {
+      qb.andWhere('college.name LIKE :collegeName', {
+        collegeName: `${collegeName}%`,
+      });
+    }
     const finalSchoolId = schoolId || school_id;
     if (finalSchoolId) {
       qb.andWhere('teacher.school_id = :school_id', {
@@ -82,27 +89,33 @@ export class TeacherService {
     const [items, total] = await qb.getManyAndCount();
 
     const flatItems = items.map((item) => {
-      const { user, id: teacher_id, ...rest } = item as any;
+      const { user, college, id: teacher_id, ...rest } = item as any;
+      const base = {
+        teacher_id,
+        ...rest,
+        college: college?.name || '',
+        collegeName: college?.name || '',
+      };
       if (user) {
-        return { teacher_id, ...rest, ...user };
+        return { ...base, ...user };
       }
-      return { teacher_id, ...rest };
+      return base;
     });
 
     return { items: flatItems, total };
   }
 
-  async findOne(userId: string) {
+  async findOne(id: string) {
     const teacher = await this.teacherRepository.findOne({
-      where: { user_id: userId },
-      relations: ['user'],
+      where: { id: id },
+      relations: ['user', 'college'],
     });
     if (!teacher) throw new NotFoundException('教师不存在');
     return teacher;
   }
 
-  async update(userId: string, data: any) {
-    const teacher = await this.findOne(userId);
+  async update(id: string, data: any) {
+    const teacher = await this.findOne(id);
     if (data.user) {
       if (data.user.password) {
         data.user.password = await bcrypt.hash(
@@ -159,11 +172,11 @@ export class TeacherService {
         await this.teacherRepository.update(teacher.id, teacherData);
       }
     }
-    return this.findOne(userId);
+    return this.findOne(id);
   }
 
-  async softDelete(userId: string) {
-    const teacher = await this.findOne(userId);
+  async softDelete(id: string) {
+    const teacher = await this.findOne(id);
     await this.userRepository.update(teacher.user_id, { status: 2 });
     return { success: true };
   }

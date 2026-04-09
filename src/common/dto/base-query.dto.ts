@@ -13,6 +13,9 @@ export class BaseQueryDto {
   @ApiPropertyOptional({ description: '学校ID' })
   schoolId?: string;
 
-  @ApiPropertyOptional({ description: '学校ID (兼容历史版本)' })
+  @ApiPropertyOptional({ description: '学院ID (兼容历史版本)' })
   school_id?: string;
+
+  @ApiPropertyOptional({ description: '学院名称' })
+  collegeName?: string;
 }
